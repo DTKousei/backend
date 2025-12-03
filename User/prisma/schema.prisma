@@ -1,0 +1,72 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model roles {
+  id             String           @id @default(uuid()) @db.VarChar(36)
+  nombre         String?          @db.VarChar(50)
+  descripcion    String?
+  roles_permisos roles_permisos[]
+  usuarios       usuarios[]
+}
+
+model permisos {
+  id               String             @id @default(uuid()) @db.VarChar(36)
+  nombre           String             @db.VarChar(100)
+  descripcion      String?
+  creado_en        DateTime           @default(now()) @db.Timestamp(6)
+  roles_permisos   roles_permisos[]
+  usuario_permisos usuario_permisos[]
+}
+
+model roles_permisos {
+  rol_id     String   @db.VarChar(36)
+  permiso_id String   @db.VarChar(36)
+  permiso    permisos @relation(fields: [permiso_id], references: [id], onDelete: Cascade)
+  rol        roles    @relation(fields: [rol_id], references: [id], onDelete: Cascade)
+
+  @@id([rol_id, permiso_id])
+}
+
+model usuarios {
+  id                 String             @id @default(uuid()) @db.VarChar(36)
+  usuario            String             @unique @db.VarChar(50)
+  correo_electronico String             @db.VarChar(80)
+  contrasena_hash    String             @db.VarChar(255)
+  rol_id             String             @db.VarChar(36)
+  esta_activo        Boolean            @default(true)
+  creado_en          DateTime           @default(now()) @db.Timestamp(6)
+  actualizado_en     DateTime           @default(now()) @updatedAt @db.Timestamp(6)
+  sesiones_usuario   sesiones_usuario[]
+  usuario_permisos   usuario_permisos[]
+  rol                roles              @relation(fields: [rol_id], references: [id])
+}
+
+model usuario_permisos {
+  usuario_id String   @db.VarChar(36)
+  permiso_id String   @db.VarChar(36)
+  permiso    permisos @relation(fields: [permiso_id], references: [id], onDelete: Cascade)
+  usuario    usuarios @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+
+  @@id([usuario_id, permiso_id])
+}
+
+model sesiones_usuario {
+  id         String   @id @default(uuid()) @db.VarChar(36)
+  usuario_id String   @db.VarChar(36)
+  token      String   @db.VarChar(500) 
+  expira_en  DateTime @db.Timestamp(6)
+  creado_en  DateTime @default(now()) @db.Timestamp(6)
+  usuario    usuarios @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+}

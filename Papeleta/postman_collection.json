@@ -1,0 +1,265 @@
+{
+  "info": {
+    "name": "API Papeletas",
+    "description": "Colección de endpoints para el sistema de papeletas (permisos)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Tipos de Permisos",
+      "item": [
+        {
+          "name": "Listar Tipos de Permisos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/permiso-tipos",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "permiso-tipos"]
+            }
+          }
+        },
+        {
+          "name": "Obtener Tipo de Permiso por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/permiso-tipos/:id",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "permiso-tipos", ":id"]
+            }
+          }
+        },
+        {
+          "name": "Crear Tipo de Permiso",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Permiso Médico\",\n  \"codigo\": \"PERMISO_MEDICO\",\n  \"descripcion\": \"Permiso por motivos médicos\",\n  \"requiere_firma_institucion\": false,\n  \"tiempo_maximo_horas\": 4,\n  \"esta_activo\": true\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/permiso-tipos",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "permiso-tipos"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Estados",
+      "item": [
+        {
+          "name": "Listar Estados",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/estados",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "estados"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Permisos",
+      "item": [
+        {
+          "name": "Listar Permisos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/permisos?page=1&limit=10",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "permisos"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Crear Permiso Personal",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"empleado_id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"tipo_permiso_id\": \"OBTENER_DE_GET_TIPOS\",\n  \"fecha_hora_inicio\": \"2024-12-02T14:00:00\",\n  \"fecha_hora_fin\": \"2024-12-02T16:00:00\",\n  \"motivo\": \"Trámite personal\",\n  \"justificacion\": \"Necesito realizar trámites bancarios urgentes\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/permisos",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "permisos"]
+            }
+          }
+        },
+        {
+          "name": "Crear Comisión de Servicio",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"empleado_id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"tipo_permiso_id\": \"OBTENER_DE_GET_TIPOS\",\n  \"fecha_hora_inicio\": \"2024-12-02T08:00:00\",\n  \"motivo\": \"Reunión interinstitucional\",\n  \"justificacion\": \"Coordinación de proyectos educativos\",\n  \"institucion_visitada\": \"Ministerio de Educación\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/permisos",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "permisos"]
+            }
+          }
+        },
+        {
+          "name": "Firmar Permiso - Solicitante",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipo_firma\": \"solicitante\",\n  \"firma\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/permisos/:id/firmar",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "permisos", ":id", "firmar"]
+            }
+          }
+        },
+        {
+          "name": "Firmar Permiso - Jefe de Área",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipo_firma\": \"jefe_area\",\n  \"firma\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/permisos/:id/firmar",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "permisos", ":id", "firmar"]
+            }
+          }
+        },
+        {
+          "name": "Firmar Permiso - RRHH",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipo_firma\": \"rrhh\",\n  \"firma\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/permisos/:id/firmar",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "permisos", ":id", "firmar"]
+            }
+          }
+        },
+        {
+          "name": "Firmar Permiso - Institución",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipo_firma\": \"institucion\",\n  \"firma\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/permisos/:id/firmar",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "permisos", ":id", "firmar"]
+            }
+          }
+        },
+        {
+          "name": "Generar PDF",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/permisos/:id/pdf",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "permisos", ":id", "pdf"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+# Archivos de Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Entorno virtual
+.venv/
+venv/
+ENV/
+
+# Variables de entorno (mantener .env.example)
+.env
+
+# Logs
+logs/*.log
+
+# Base de datos
+*.db
+*.sqlite
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/

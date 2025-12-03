@@ -1,0 +1,27 @@
+# Dependencias para API REST ZKTeco
+# Framework Web
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+
+# Base de Datos
+mysql-connector-python==8.2.0
+sqlalchemy==2.0.23
+pymysql==1.1.0
+
+# Validación y Serialización
+pydantic==2.5.0
+pydantic-settings==2.1.0
+email-validator==2.1.0
+
+# Utilidades
+python-dotenv==1.0.0
+python-dateutil==2.8.2
+
+# Dependencias ZKTeco (del proyecto original)
+pyzk==0.9
+
+# CORS y Seguridad
+python-multipart==0.0.6
+
+# Logging y Monitoreo
+python-json-logger==2.0.7

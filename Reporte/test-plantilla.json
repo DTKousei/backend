@@ -1,0 +1,10 @@
+{
+  "nombre": "Reporte Mensual de Asistencia",
+  "tipo_reporte_id": 1,
+  "descripcion": "Reporte detallado de asistencia mensual para empleados",
+  "esta_activo": true,
+  "parametros": {
+    "incluir_totales": true,
+    "formato_fecha": "DD/MM/YYYY"
+  }
+}

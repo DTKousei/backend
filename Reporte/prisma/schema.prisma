@@ -1,0 +1,74 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- Tablas de Referencia ---
+
+/// @map("tipo_reporte")
+model TipoReporte {
+  id     Int    @id @default(autoincrement())
+  nombre String @db.VarChar(50)
+
+  // Relación: Un TipoReporte tiene muchas PlantillasReporte
+  plantillas PlantillasReporte[]
+}
+
+// Enum para el campo formato_archivo en la tabla reportes_generados
+// Asume que los valores son conocidos y limitados
+enum ReportesGeneradosFormatoArchivo {
+  PDF
+  XLSX
+  CSV
+  JSON
+  // Agrega más formatos si es necesario
+}
+
+// --- Tablas Principales ---
+
+/// @map("plantillas_reporte")
+model PlantillasReporte {
+  id          String   @id @db.VarChar(36) // Asumo que es un UUID o string de 36 caracteres
+  nombre      String   @db.VarChar(100)
+  descripcion String?  @db.Text
+  parametros  Json? // JSON
+  esta_activo Boolean
+  creado_en   DateTime @default(now()) @db.Timestamp()
+
+  // Foreign Key para tipo_reporte
+  tipo_reporte_id Int
+  tipo_reporte    TipoReporte @relation(fields: [tipo_reporte_id], references: [id])
+
+  // Relación: Una PlantillaReporte tiene muchos ReportesGenerados
+  reportes_generados ReportesGenerados[]
+
+  @@index([tipo_reporte_id])
+}
+
+/// @map("reportes_generados")
+model ReportesGenerados {
+  id                 String                          @id @db.VarChar(36) // Asumo que es un UUID o string de 36 caracteres
+  Empleado_id        String                          @db.VarChar(36) // Asumo que es la clave de un Empleado (sin tabla Empleado mostrada)
+  nombre_reporte     String                          @db.VarChar(200)
+  parametros         Json // JSON NN (Not Null)
+  ruta_archivo       String                          @db.VarChar(500)
+  formato_archivo    ReportesGeneradosFormatoArchivo // Enum
+  cantidad_registros Int? // Nullable si no tiene NN en el diagrama
+  generado_en        DateTime?                       @db.Timestamp() // Nullable si no tiene NN en el diagrama
+
+  // Foreign Key para plantillas_reporte
+  plantilla_id String            @db.VarChar(36)
+  plantilla    PlantillasReporte @relation(fields: [plantilla_id], references: [id])
+
+  @@index([plantilla_id])
+}

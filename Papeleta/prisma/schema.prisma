@@ -1,0 +1,124 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- Tablas del Diagrama E-R ---
+
+// 1. Modelo: permisos_tipos (Tipos de Permisos)
+model PermisoTipo {
+  id                         String   @id @default(uuid()) @map("id")
+  nombre                     String   @db.VarChar(100)
+  codigo                     String   @unique @db.VarChar(20)
+  descripcion                String?
+  requiere_firma_institucion Boolean  @default(false) // true para comisión de servicio
+  tiempo_maximo_horas        Int? // null = sin límite (comisión), 2 = permiso personal
+  esta_activo                Boolean  @default(true)
+  creado_en                  DateTime @default(now())
+  actualizado_en             DateTime @updatedAt
+
+  // Relación con 'Permiso'
+  permisos Permiso[]
+
+  @@map("permisos_tipos")
+}
+
+// 2. Modelo: estados (Estados de los Permisos)
+model Estado {
+  id             String   @id @default(uuid()) @map("id")
+  nombre         String   @db.VarChar(50)
+  codigo         String   @unique @db.VarChar(20)
+  descripcion    String?
+  creado_en      DateTime @default(now())
+  actualizado_en DateTime @updatedAt
+
+  // Relación con 'Permiso'
+  permisos Permiso[]
+
+  @@map("estados")
+}
+
+// 3. Modelo: permisos (Permisos) - La tabla central
+model Permiso {
+  id              String @id @default(uuid()) @map("id")
+  empleado_id     String @db.VarChar(36) // FK a tabla empleados
+  tipo_permiso_id String @db.VarChar(36)
+  estado_id       String @db.VarChar(36)
+
+  // Fechas y horarios
+  fecha_hora_inicio     DateTime
+  fecha_hora_fin        DateTime?
+  hora_salida_calculada DateTime? // Hora de salida según tipo de permiso
+
+  // Información del permiso
+  motivo               String  @db.Text
+  justificacion        String  @db.Text
+  institucion_visitada String? @db.VarChar(255) // Solo para comisión de servicio
+
+  // Firmas electrónicas tradicionales (base64 o URLs)
+  firma_solicitante String? @db.Text
+  firma_jefe_area   String? @db.Text
+  firma_rrhh        String? @db.Text
+  firma_institucion String? @db.Text // Solo para comisión de servicio
+
+  // Timestamps de firmas tradicionales
+  firma_solicitante_en DateTime?
+  firma_jefe_area_en   DateTime?
+  firma_rrhh_en        DateTime?
+  firma_institucion_en DateTime?
+
+  // Firmas digitales ONPE (PKCS#7)
+  firma_solicitante_digital String? @db.Text
+  firma_jefe_area_digital   String? @db.Text
+  firma_rrhh_digital        String? @db.Text
+  firma_institucion_digital String? @db.Text
+
+  // Certificados digitales (JSON con info del certificado)
+  certificado_solicitante Json?
+  certificado_jefe_area   Json?
+  certificado_rrhh        Json?
+  certificado_institucion Json?
+
+  // Estado de validación de firmas digitales
+  firma_solicitante_validada Boolean?
+  firma_jefe_area_validada   Boolean?
+  firma_rrhh_validada        Boolean?
+  firma_institucion_validada Boolean?
+
+  // Hash del documento para validación
+  documento_hash String? @db.VarChar(64)
+
+  // Método de firma usado
+  metodo_firma_solicitante String? @db.VarChar(20) // "base64" o "onpe"
+  metodo_firma_jefe_area   String? @db.VarChar(20)
+  metodo_firma_rrhh        String? @db.VarChar(20)
+  metodo_firma_institucion String? @db.VarChar(20)
+
+  // Gestión de PDFs
+  pdf_generado_path String? @db.VarChar(500) // Ruta del PDF generado
+  pdf_firmado_path  String? @db.VarChar(500) // Ruta del PDF firmado cargado
+
+  // Auditoría
+  creado_en      DateTime @default(now())
+  actualizado_en DateTime @updatedAt
+
+  // Relaciones
+  tipo_permiso PermisoTipo @relation(fields: [tipo_permiso_id], references: [id])
+  estado       Estado      @relation(fields: [estado_id], references: [id])
+
+  @@index([empleado_id])
+  @@index([estado_id])
+  @@index([tipo_permiso_id])
+  @@index([fecha_hora_inicio])
+  @@map("permisos")
+}

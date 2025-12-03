@@ -1,0 +1,18 @@
+-- AlterTable
+ALTER TABLE "permisos" ADD COLUMN     "certificado_institucion" JSONB,
+ADD COLUMN     "certificado_jefe_area" JSONB,
+ADD COLUMN     "certificado_rrhh" JSONB,
+ADD COLUMN     "certificado_solicitante" JSONB,
+ADD COLUMN     "documento_hash" VARCHAR(64),
+ADD COLUMN     "firma_institucion_digital" TEXT,
+ADD COLUMN     "firma_institucion_validada" BOOLEAN,
+ADD COLUMN     "firma_jefe_area_digital" TEXT,
+ADD COLUMN     "firma_jefe_area_validada" BOOLEAN,
+ADD COLUMN     "firma_rrhh_digital" TEXT,
+ADD COLUMN     "firma_rrhh_validada" BOOLEAN,
+ADD COLUMN     "firma_solicitante_digital" TEXT,
+ADD COLUMN     "firma_solicitante_validada" BOOLEAN,
+ADD COLUMN     "metodo_firma_institucion" VARCHAR(20),
+ADD COLUMN     "metodo_firma_jefe_area" VARCHAR(20),
+ADD COLUMN     "metodo_firma_rrhh" VARCHAR(20),
+ADD COLUMN     "metodo_firma_solicitante" VARCHAR(20);

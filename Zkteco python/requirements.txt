@@ -1,0 +1,6 @@
+# Dependencias para el sistema de integración con ZKTeco
+# Librería principal para comunicación con dispositivos ZKTeco
+pyzk==0.9
+
+# Utilidades adicionales
+python-dateutil==2.8.2

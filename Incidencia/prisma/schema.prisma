@@ -1,0 +1,67 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 1. Modelo: TipoIncidencia (tipos_incidencia)
+model TipoIncidencia {
+  id                  String    @id @default(uuid())
+  nombre              String    @db.VarChar(100)
+  codigo              String    @db.VarChar(20)
+  requiere_aprobacion Boolean
+  requiere_documento  Boolean
+  descuenta_salario   Boolean
+  esta_activo         Boolean
+  creado_en           DateTime?
+
+  // Relación: Un tipo de incidencia puede tener muchas incidencias
+  incidencias Incidencia[]
+
+  @@map("tipos_incidencia")
+}
+
+// 2. Modelo: Estado (estados)
+model Estado {
+  id          String  @id @default(uuid())
+  nombre      String  @db.VarChar(50)
+  descripcion String?
+
+  // Relación: Un estado puede estar en muchas incidencias
+  incidencias Incidencia[]
+
+  @@map("estados")
+}
+
+// --------------------------------------------------------
+
+// 3. Modelo: Incidencia (incidencias)
+model Incidencia {
+  id                 String    @id @default(uuid())
+  empleado_id        String    @db.VarChar(36) // FK a Empleado
+  tipo_incidencia_id String    @db.VarChar(36)
+  fecha_inicio       DateTime  @db.Date
+  fecha_fin          DateTime  @db.Date
+  descripcion        String    @db.Text
+  url_documento      String    @db.VarChar(500)
+  estado_id          String    @db.VarChar(36)
+  aprobado_por       String?   @db.VarChar(36) // FK a Empleado (el que aprueba)
+  aprobado_en        DateTime?
+  motivo_rechazo     String?   @db.Text
+  creado_en          DateTime?
+
+  // Definición de las relaciones
+  tipo_incidencia TipoIncidencia @relation(fields: [tipo_incidencia_id], references: [id])
+  estado          Estado         @relation(fields: [estado_id], references: [id])
+
+  @@map("incidencias")
+}
