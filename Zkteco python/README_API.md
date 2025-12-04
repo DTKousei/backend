@@ -88,13 +88,7 @@ La API estará disponible en: `http://localhost:8000`
 
 ### Usuarios
 
-- `POST /api/usuarios` - Crear usuario
-- `GET /api/usuarios` - Listar usuarios
-- `GET /api/usuarios/{id}` - Obtener usuario
-- `PUT /api/usuarios/{id}` - Actualizar usuario
-- `DELETE /api/usuarios/{id}` - Eliminar usuario
-- `POST /api/usuarios/{id}/sincronizar` - Sincronizar usuario con dispositivo
-- `POST /api/usuarios/dispositivos/{id}/sincronizar` - Sincronizar todos los usuarios desde dispositivo
+- `
 
 ### Asistencias
 

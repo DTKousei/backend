@@ -195,17 +195,21 @@ export const generarPDFPapeleta = async (permiso, tipoPermiso, empleadoInfo = {}
           doc.text(`Entidad: ${firmaInfo.certificado.entidad_emisora || 'N/A'}`, xPosition, yPosition + 52);
           
           // Generar y agregar QR code
-          try {
-            const qrBuffer = await generarQRBuffer(permiso.id, firmaInfo.tipo, firmaInfo.certificado);
-            doc.image(qrBuffer, xPosition + 150, yPosition + 15, {
-              width: 60,
-              height: 60
+          // Nota: No podemos usar await aquí porque no estamos en contexto async
+          // El QR se generará pero no bloqueará el flujo
+          generarQRBuffer(permiso.id, firmaInfo.tipo, firmaInfo.certificado)
+            .then(qrBuffer => {
+              doc.image(qrBuffer, xPosition + 150, yPosition + 15, {
+                width: 60,
+                height: 60
+              });
+              doc.fontSize(7)
+                 .text('Verificar', xPosition + 160, yPosition + 78, { width: 40, align: 'center' });
+            })
+            .catch(error => {
+              console.error('Error generando QR:', error);
             });
-            doc.fontSize(7)
-               .text('Verificar', xPosition + 160, yPosition + 78, { width: 40, align: 'center' });
-          } catch (error) {
-            console.error('Error generando QR:', error);
-          }
+
 
         } else if (firmaInfo.firma) {
           // Firma tradicional base64
