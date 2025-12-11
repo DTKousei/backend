@@ -19,7 +19,7 @@
 ### Base URL
 
 ```
-http://localhost:3000
+http://localhost:3002
 ```
 
 ### Headers Comunes
@@ -43,7 +43,7 @@ Content-Type: application/json
 **Ejemplo de Petición:**
 
 ```bash
-curl http://localhost:3000/api/permiso-tipos
+curl http://localhost:3002/api/permiso-tipos
 ```
 
 **Respuesta Exitosa (200):**
@@ -88,7 +88,7 @@ curl http://localhost:3000/api/permiso-tipos
 **Ejemplo de Petición:**
 
 ```bash
-curl http://localhost:3000/api/permiso-tipos/550e8400-e29b-41d4-a716-446655440000
+curl http://localhost:3002/api/permiso-tipos/550e8400-e29b-41d4-a716-446655440000
 ```
 
 **Respuesta Exitosa (200):**
@@ -135,7 +135,7 @@ curl http://localhost:3000/api/permiso-tipos/550e8400-e29b-41d4-a716-44665544000
 **Ejemplo de Petición:**
 
 ```bash
-curl -X POST http://localhost:3000/api/permiso-tipos \
+curl -X POST http://localhost:3002/api/permiso-tipos \
   -H "Content-Type: application/json" \
   -d '{
     "nombre": "Permiso Médico",
@@ -178,7 +178,7 @@ curl -X POST http://localhost:3000/api/permiso-tipos \
 **Ejemplo de Petición:**
 
 ```bash
-curl http://localhost:3000/api/estados
+curl http://localhost:3002/api/estados
 ```
 
 **Respuesta Exitosa (200):**
@@ -232,7 +232,7 @@ curl http://localhost:3000/api/estados
 **Ejemplo de Petición:**
 
 ```bash
-curl -X POST http://localhost:3000/api/permisos \
+curl -X POST http://localhost:3002/api/permisos \
   -H "Content-Type: application/json" \
   -d '{
     "empleado_id": "12345678",
@@ -301,7 +301,7 @@ curl -X POST http://localhost:3000/api/permisos \
 **Ejemplo de Petición:**
 
 ```bash
-curl -X POST http://localhost:3000/api/permisos \
+curl -X POST http://localhost:3002/api/permisos \
   -H "Content-Type: application/json" \
   -d '{
     "empleado_id": "87654321",
@@ -362,10 +362,10 @@ curl -X POST http://localhost:3000/api/permisos \
 
 ```bash
 # Listar todos los permisos del empleado 12345678
-curl "http://localhost:3000/api/permisos?empleado_id=12345678&page=1&limit=10"
+curl "http://localhost:3002/api/permisos?empleado_id=12345678&page=1&limit=10"
 
 # Listar permisos por rango de fechas
-curl "http://localhost:3000/api/permisos?fecha_desde=2024-12-01&fecha_hasta=2024-12-31"
+curl "http://localhost:3002/api/permisos?fecha_desde=2024-12-01&fecha_hasta=2024-12-31"
 ```
 
 **Respuesta Exitosa (200):**
@@ -424,7 +424,7 @@ curl "http://localhost:3000/api/permisos?fecha_desde=2024-12-01&fecha_hasta=2024
 **Ejemplo de Petición:**
 
 ```bash
-curl -X PATCH http://localhost:3000/api/permisos/a50e8400-e29b-41d4-a716-446655440005/firmar \
+curl -X PATCH http://localhost:3002/api/permisos/a50e8400-e29b-41d4-a716-446655440005/firmar \
   -H "Content-Type: application/json" \
   -d '{
     "tipo_firma": "solicitante",
@@ -479,7 +479,7 @@ curl -X PATCH http://localhost:3000/api/permisos/a50e8400-e29b-41d4-a716-4466554
 **Ejemplo de Petición:**
 
 ```bash
-curl -X PATCH http://localhost:3000/api/permisos/a50e8400-e29b-41d4-a716-446655440005/firmar-digital \
+curl -X PATCH http://localhost:3002/api/permisos/a50e8400-e29b-41d4-a716-446655440005/firmar-digital \
   -H "Content-Type: application/json" \
   -d '{
     "tipo_firma": "solicitante",
@@ -521,7 +521,7 @@ curl -X PATCH http://localhost:3000/api/permisos/a50e8400-e29b-41d4-a716-4466554
     "fecha_expiracion": "2025-01-15T00:00:00.000Z"
   },
   "qr_verificacion": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMgAAADI...",
-  "url_verificacion": "http://localhost:3000/api/permisos/a50e8400-e29b-41d4-a716-446655440005/verificar-firma/solicitante?hash=abc123",
+  "url_verificacion": "http://localhost:3002/api/permisos/a50e8400-e29b-41d4-a716-446655440005/verificar-firma/solicitante?hash=abc123",
   "firmas_completas": false
 }
 ```
@@ -535,7 +535,7 @@ curl -X PATCH http://localhost:3000/api/permisos/a50e8400-e29b-41d4-a716-4466554
 **Ejemplo de Petición:**
 
 ```bash
-curl http://localhost:3000/api/permisos/a50e8400-e29b-41d4-a716-446655440005/verificar-firma/solicitante
+curl http://localhost:3002/api/permisos/a50e8400-e29b-41d4-a716-446655440005/verificar-firma/solicitante
 ```
 
 **Respuesta Exitosa (200):**
@@ -582,7 +582,7 @@ curl http://localhost:3000/api/permisos/a50e8400-e29b-41d4-a716-446655440005/ver
 **Ejemplo de Petición:**
 
 ```bash
-curl http://localhost:3000/api/permisos/a50e8400-e29b-41d4-a716-446655440005/pdf \
+curl http://localhost:3002/api/permisos/a50e8400-e29b-41d4-a716-446655440005/pdf \
   --output papeleta.pdf
 ```
 
@@ -613,7 +613,7 @@ curl http://localhost:3000/api/permisos/a50e8400-e29b-41d4-a716-446655440005/pdf
 **Ejemplo de Petición:**
 
 ```bash
-curl -X POST http://localhost:3000/api/permisos/b50e8400-e29b-41d4-a716-446655440006/upload-pdf \
+curl -X POST http://localhost:3002/api/permisos/b50e8400-e29b-41d4-a716-446655440006/upload-pdf \
   -F "pdf=@papeleta-firmada.pdf"
 ```
 
@@ -644,7 +644,7 @@ curl -X POST http://localhost:3000/api/permisos/b50e8400-e29b-41d4-a716-44665544
 **Paso 1: Crear el permiso**
 
 ```bash
-curl -X POST http://localhost:3000/api/permisos \
+curl -X POST http://localhost:3002/api/permisos \
   -H "Content-Type: application/json" \
   -d '{
     "empleado_id": "12345678",
@@ -659,7 +659,7 @@ curl -X POST http://localhost:3000/api/permisos \
 **Paso 2: Firmar como solicitante**
 
 ```bash
-curl -X PATCH http://localhost:3000/api/permisos/{PERMISO_ID}/firmar \
+curl -X PATCH http://localhost:3002/api/permisos/{PERMISO_ID}/firmar \
   -H "Content-Type: application/json" \
   -d '{
     "tipo_firma": "solicitante",
@@ -670,7 +670,7 @@ curl -X PATCH http://localhost:3000/api/permisos/{PERMISO_ID}/firmar \
 **Paso 3: Firmar como jefe de área**
 
 ```bash
-curl -X PATCH http://localhost:3000/api/permisos/{PERMISO_ID}/firmar \
+curl -X PATCH http://localhost:3002/api/permisos/{PERMISO_ID}/firmar \
   -H "Content-Type: application/json" \
   -d '{
     "tipo_firma": "jefe_area",
@@ -681,7 +681,7 @@ curl -X PATCH http://localhost:3000/api/permisos/{PERMISO_ID}/firmar \
 **Paso 4: Firmar como RRHH**
 
 ```bash
-curl -X PATCH http://localhost:3000/api/permisos/{PERMISO_ID}/firmar \
+curl -X PATCH http://localhost:3002/api/permisos/{PERMISO_ID}/firmar \
   -H "Content-Type: application/json" \
   -d '{
     "tipo_firma": "rrhh",
@@ -692,7 +692,7 @@ curl -X PATCH http://localhost:3000/api/permisos/{PERMISO_ID}/firmar \
 **Paso 5: Generar PDF**
 
 ```bash
-curl http://localhost:3000/api/permisos/{PERMISO_ID}/pdf \
+curl http://localhost:3002/api/permisos/{PERMISO_ID}/pdf \
   --output papeleta-aprobada.pdf
 ```
 
@@ -703,7 +703,7 @@ curl http://localhost:3000/api/permisos/{PERMISO_ID}/pdf \
 **Paso 1: Crear la comisión**
 
 ```bash
-curl -X POST http://localhost:3000/api/permisos \
+curl -X POST http://localhost:3002/api/permisos \
   -H "Content-Type: application/json" \
   -d '{
     "empleado_id": "87654321",
@@ -718,7 +718,7 @@ curl -X POST http://localhost:3000/api/permisos \
 **Paso 2: Firmar digitalmente como solicitante**
 
 ```bash
-curl -X PATCH http://localhost:3000/api/permisos/{PERMISO_ID}/firmar-digital \
+curl -X PATCH http://localhost:3002/api/permisos/{PERMISO_ID}/firmar-digital \
   -H "Content-Type: application/json" \
   -d '{
     "tipo_firma": "solicitante",
@@ -733,7 +733,7 @@ curl -X PATCH http://localhost:3000/api/permisos/{PERMISO_ID}/firmar-digital \
 **Paso 3: Firmar digitalmente como jefe**
 
 ```bash
-curl -X PATCH http://localhost:3000/api/permisos/{PERMISO_ID}/firmar-digital \
+curl -X PATCH http://localhost:3002/api/permisos/{PERMISO_ID}/firmar-digital \
   -H "Content-Type: application/json" \
   -d '{
     "tipo_firma": "jefe_area",
@@ -748,7 +748,7 @@ curl -X PATCH http://localhost:3000/api/permisos/{PERMISO_ID}/firmar-digital \
 **Paso 4: Firmar digitalmente como RRHH**
 
 ```bash
-curl -X PATCH http://localhost:3000/api/permisos/{PERMISO_ID}/firmar-digital \
+curl -X PATCH http://localhost:3002/api/permisos/{PERMISO_ID}/firmar-digital \
   -H "Content-Type: application/json" \
   -d '{
     "tipo_firma": "rrhh",
@@ -763,21 +763,21 @@ curl -X PATCH http://localhost:3000/api/permisos/{PERMISO_ID}/firmar-digital \
 **Paso 5: Generar PDF para llevar a institución**
 
 ```bash
-curl http://localhost:3000/api/permisos/{PERMISO_ID}/pdf \
+curl http://localhost:3002/api/permisos/{PERMISO_ID}/pdf \
   --output papeleta-para-firma.pdf
 ```
 
 **Paso 6: Cargar PDF con firma de institución**
 
 ```bash
-curl -X POST http://localhost:3000/api/permisos/{PERMISO_ID}/upload-pdf \
+curl -X POST http://localhost:3002/api/permisos/{PERMISO_ID}/upload-pdf \
   -F "pdf=@papeleta-firmada-institucion.pdf"
 ```
 
 **Paso 7: Verificar firma (público)**
 
 ```bash
-curl http://localhost:3000/api/permisos/{PERMISO_ID}/verificar-firma/solicitante
+curl http://localhost:3002/api/permisos/{PERMISO_ID}/verificar-firma/solicitante
 ```
 
 ---
