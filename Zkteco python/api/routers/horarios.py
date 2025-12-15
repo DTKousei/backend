@@ -80,3 +80,54 @@ def eliminar_horario(horario_id: int, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Horario {horario_id} no encontrado"
         )
+    return True
+
+
+# Endpoints para Segmentos
+from schemas.horario import SegmentoHorarioCreate, SegmentoHorarioResponse, AsignacionHorarioCreate, AsignacionHorarioResponse, SegmentoHorarioBulkCreate, FeriadoCreate, FeriadoResponse
+
+@router.post("/segmentos/", response_model=SegmentoHorarioResponse, status_code=status.HTTP_201_CREATED)
+def crear_segmento(segmento: SegmentoHorarioCreate, db: Session = Depends(get_db)):
+    return HorarioService.crear_segmento(db, segmento)
+
+@router.post("/segmentos/bulk", response_model=List[SegmentoHorarioResponse], status_code=status.HTTP_201_CREATED)
+def crear_segmentos_masivo(bulk_data: SegmentoHorarioBulkCreate, db: Session = Depends(get_db)):
+    return HorarioService.crear_segmentos_bulk(db, bulk_data)
+
+
+@router.get("/{horario_id}/segmentos", response_model=List[SegmentoHorarioResponse])
+def listar_segmentos(horario_id: int, db: Session = Depends(get_db)):
+    return HorarioService.obtener_segmentos(db, horario_id)
+
+@router.delete("/segmentos/{segmento_id}", status_code=status.HTTP_204_NO_CONTENT)
+def eliminar_segmento(segmento_id: int, db: Session = Depends(get_db)):
+    if not HorarioService.eliminar_segmento(db, segmento_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Segmento {segmento_id} no encontrado"
+        )
+
+# Endpoints para Asignaciones
+@router.post("/asignar", response_model=AsignacionHorarioResponse)
+def asignar_horario(asignacion: AsignacionHorarioCreate, db: Session = Depends(get_db)):
+    # Validar fechas logic? Dejamos que el service o BD manejen por ahora
+    return HorarioService.asignar_horario(db, asignacion)
+
+
+# Endpoints para Feriados
+@router.post("/feriados/", response_model=FeriadoResponse, status_code=status.HTTP_201_CREATED)
+def crear_feriado(feriado: FeriadoCreate, db: Session = Depends(get_db)):
+    return HorarioService.crear_feriado(db, feriado)
+
+@router.get("/feriados/", response_model=List[FeriadoResponse])
+def listar_feriados(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    return HorarioService.obtener_feriados(db, skip=skip, limit=limit)
+
+@router.delete("/feriados/{feriado_id}", status_code=status.HTTP_204_NO_CONTENT)
+def eliminar_feriado(feriado_id: int, db: Session = Depends(get_db)):
+    if not HorarioService.eliminar_feriado(db, feriado_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Feriado {feriado_id} no encontrado"
+        )
+

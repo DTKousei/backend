@@ -17,11 +17,11 @@ class Asistencia(Base):
     
     # Campos principales
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    user_id = Column(String(20), nullable=False, index=True, comment="ID del usuario")
+    user_id = Column(String(20), ForeignKey("usuarios.user_id", ondelete="CASCADE"), nullable=False, index=True, comment="ID del usuario")
     
     # Relaciones
     dispositivo_id = Column(Integer, ForeignKey("dispositivos.id", ondelete="CASCADE"), nullable=False)
-    usuario_db_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    # usuario_db_id eliminado, usamos user_id directo
     
     # Información del registro
     timestamp = Column(DateTime, nullable=False, index=True, comment="Fecha y hora de la marcación")

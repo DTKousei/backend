@@ -5,7 +5,7 @@ Validación de datos de entrada y salida de la API
 
 from pydantic import BaseModel, Field
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, time
 
 
 class AsistenciaBase(BaseModel):
@@ -45,3 +45,21 @@ class AsistenciaSincronizacion(BaseModel):
     registros_nuevos: int = 0
     registros_totales: int = 0
     dispositivo_id: int
+
+
+class AsistenciaDiariaResponse(BaseModel):
+    """Schema para reporte de asistencia diaria"""
+    id: int
+    fecha: datetime
+    user_id: str
+    horario_id_snapshot: Optional[int]
+    horas_esperadas: float
+    horas_trabajadas: float
+    estado_asistencia: str
+    es_justificado: bool
+    entrada_real: Optional[time]
+    salida_real: Optional[time]
+    
+    class Config:
+        from_attributes = True
+

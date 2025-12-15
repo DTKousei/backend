@@ -6,12 +6,13 @@ Endpoints para gestión de registros de asistencia
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, date
 from models.database import get_db
 from schemas.asistencia import (
     AsistenciaResponse,
     AsistenciaFilter,
-    AsistenciaSincronizacion
+    AsistenciaSincronizacion,
+    AsistenciaDiariaResponse
 )
 from services.asistencia_service import AsistenciaService
 
@@ -137,3 +138,31 @@ def limpiar_asistencias_dispositivo(dispositivo_id: int, db: Session = Depends(g
             detail=resultado["message"]
         )
     return resultado
+
+
+# Endpoints de Reportes y Cálculo
+
+@router.post("/calcular", status_code=status.HTTP_200_OK)
+def calcular_asistencia(
+    fecha_inicio: date,
+    fecha_fin: date,
+    user_id: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Calcula o recalcula la asistencia diaria procesada para un rango de fechas.
+    """
+    resultados = AsistenciaService.calcular_rango_asistencia(db, fecha_inicio, fecha_fin, user_id)
+    return {"message": "Cálculo completado", "dias_procesados": len(resultados)}
+
+@router.get("/reporte", response_model=List[AsistenciaDiariaResponse])
+def obtener_reporte_asistencia(
+    fecha_inicio: date,
+    fecha_fin: date,
+    user_id: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Obtiene el reporte procesado de asistencia diaria.
+    """
+    return AsistenciaService.obtener_reporte(db, fecha_inicio, fecha_fin, user_id)
