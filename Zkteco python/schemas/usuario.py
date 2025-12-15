@@ -5,7 +5,7 @@ Validación de datos de entrada y salida de la API
 
 from pydantic import BaseModel, Field, EmailStr
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, date
 
 
 class UsuarioBase(BaseModel):
@@ -19,6 +19,11 @@ class UsuarioBase(BaseModel):
     telefono: Optional[str] = Field(None, max_length=20, description="Teléfono")
     departamento: Optional[str] = Field(None, max_length=100, description="Departamento")
     cargo: Optional[str] = Field(None, max_length=100, description="Cargo")
+    
+    # Nuevos campos
+    fecha_nacimiento: Optional[date] = Field(None, description="Fecha de nacimiento")
+    direccion: Optional[str] = Field(None, max_length=255, description="Dirección")
+    comentarios: Optional[str] = Field(None, max_length=500, description="Comentarios")
 
 
 class UsuarioCreate(UsuarioBase):
@@ -36,6 +41,11 @@ class UsuarioUpdate(BaseModel):
     telefono: Optional[str] = Field(None, max_length=20)
     departamento: Optional[str] = Field(None, max_length=100)
     cargo: Optional[str] = Field(None, max_length=100)
+    
+    # Nuevos campos
+    fecha_nacimiento: Optional[date] = None
+    direccion: Optional[str] = Field(None, max_length=255)
+    comentarios: Optional[str] = Field(None, max_length=500)
 
 
 class UsuarioResponse(UsuarioBase):

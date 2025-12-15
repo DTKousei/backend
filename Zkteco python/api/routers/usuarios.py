@@ -62,6 +62,20 @@ def obtener_usuario(usuario_id: int, db: Session = Depends(get_db)):
     return usuario
 
 
+@router.get("/user_id/{user_id}", response_model=UsuarioResponse)
+def obtener_usuario_por_user_id(user_id: str, db: Session = Depends(get_db)):
+    """
+    Obtiene un usuario específico por su user_id (ID del dispositivo)
+    """
+    usuario = UsuarioService.obtener_usuario_por_user_id(db, user_id)
+    if not usuario:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Usuario con user_id {user_id} no encontrado"
+        )
+    return usuario
+
+
 @router.put("/{usuario_id}", response_model=UsuarioResponse)
 def actualizar_usuario(
     usuario_id: int,

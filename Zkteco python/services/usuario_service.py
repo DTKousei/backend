@@ -46,7 +46,10 @@ class UsuarioService:
             email=usuario.email,
             telefono=usuario.telefono,
             departamento=usuario.departamento,
-            cargo=usuario.cargo
+            cargo=usuario.cargo,
+            fecha_nacimiento=usuario.fecha_nacimiento,
+            direccion=usuario.direccion,
+            comentarios=usuario.comentarios
         )
         
         db.add(db_usuario)

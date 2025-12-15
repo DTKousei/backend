@@ -3,7 +3,7 @@ Modelo de Usuario
 Representa un usuario registrado en el sistema y en los dispositivos ZKTeco
 """
 
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Date
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from models.database import Base
@@ -34,6 +34,11 @@ class Usuario(Base):
     telefono = Column(String(20), comment="Teléfono del usuario")
     departamento = Column(String(100), comment="Departamento")
     cargo = Column(String(100), comment="Cargo o posición")
+    
+    # Nuevos campos
+    fecha_nacimiento = Column(Date, nullable=True, comment="Fecha de nacimiento")
+    direccion = Column(String(255), nullable=True, comment="Dirección del usuario")
+    comentarios = Column(String(500), nullable=True, comment="Comentarios adicionales")
     
     # Timestamps
     fecha_creacion = Column(DateTime, default=datetime.now, comment="Fecha de registro")
