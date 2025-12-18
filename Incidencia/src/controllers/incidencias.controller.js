@@ -280,6 +280,79 @@ const rechazarIncidencia = async (req, res, next) => {
   }
 };
 
+/**
+ * Obtener reporte de sábana (conteo de incidencias)
+ */
+const getReporteSabana = async (req, res, next) => {
+  try {
+    const { fecha_inicio, fecha_fin, empleado_ids } = req.body;
+
+    // Validar fechas
+    if (!fecha_inicio || !fecha_fin) {
+      return res.status(400).json({
+        error: 'Fechas requeridas',
+        message: 'Debe proporcionar fecha_inicio y fecha_fin',
+      });
+    }
+
+    const reportStartDate = new Date(fecha_inicio);
+    const reportEndDate = new Date(fecha_fin);
+
+    // Filtros dinámicos
+    const where = {
+      fecha_inicio: {
+        gte: reportStartDate,
+        lte: reportEndDate,
+      },
+    };
+
+    if (empleado_ids && Array.isArray(empleado_ids) && empleado_ids.length > 0) {
+      where.empleado_id = { in: empleado_ids };
+    }
+
+    // Obtener conteo agrupado
+    const conteo = await prisma.incidencia.groupBy({
+      by: ['empleado_id', 'tipo_incidencia_id', 'estado_id'],
+      _count: {
+        _all: true,
+      },
+      where,
+    });
+
+    // Obtener catálogos para mapear nombres
+    const [tipos, estados] = await Promise.all([
+      prisma.tipoIncidencia.findMany(),
+      prisma.estado.findMany(),
+    ]);
+
+    // Crear mapas para búsqueda rápida
+    const tiposMap = tipos.reduce((acc, curr) => ({ ...acc, [curr.id]: curr.nombre }), {});
+    const estadosMap = estados.reduce((acc, curr) => ({ ...acc, [curr.id]: curr.nombre }), {});
+
+    // Formatear respuesta
+    const reporte = conteo.map((item) => ({
+      empleado_id: item.empleado_id,
+      tipo_incidencia_id: item.tipo_incidencia_id,
+      tipo_incidencia: tiposMap[item.tipo_incidencia_id] || 'Desconocido',
+      estado_id: item.estado_id,
+      estado: estadosMap[item.estado_id] || 'Desconocido',
+      total: item._count._all,
+    }));
+
+    res.json({
+      data: reporte,
+      meta: {
+        fecha_inicio: reportStartDate,
+        fecha_fin: reportEndDate,
+        cantidad_registros: reporte.length
+      }
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createIncidencia,
   getAllIncidencias,
@@ -288,4 +361,5 @@ module.exports = {
   deleteIncidencia,
   aprobarIncidencia,
   rechazarIncidencia,
+  getReporteSabana,
 };

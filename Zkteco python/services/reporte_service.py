@@ -6,6 +6,8 @@ from typing import List, Dict, Any, Optional
 from models.usuario import Usuario
 from models.reportes import AsistenciaDiaria
 from models.horario import Horario # Potentially needed for labels or checking non-working days
+from models.turnos import AsignacionHorario, SegmentosHorario # Models for checking schedule
+from sqlalchemy import or_
 # Si Horario logic is needed for "Feriado" vs "Domingo", we might need more logic here.
 # For now relying on AsistenciaDiaria.estado_asistencia or simple calendar logic.
 
@@ -94,6 +96,47 @@ class ReporteService:
             dia = reg.fecha.day
             map_registros[(reg.user_id, dia)] = reg
 
+        # 4.5 Obtener Horarios y Asignaciones
+        # Necesitamos saber qué horario tenía asignado cada usuario en cada día del mes
+        
+        # A) Obtener Asignaciones que se solapen con el mes
+        # Rango del mes: fecha_inicio a fecha_fin
+        
+        # IDs de usuarios (strings) que estamos procesando
+        user_ids_filtro = [e.user_id for e in empleados]
+        
+        query_asig = db.query(AsignacionHorario).filter(
+            AsignacionHorario.user_id.in_(user_ids_filtro),
+            AsignacionHorario.fecha_inicio <= fecha_fin,
+            or_(
+                AsignacionHorario.fecha_fin == None,
+                AsignacionHorario.fecha_fin >= fecha_inicio
+            )
+        )
+        asignaciones = query_asig.all()
+        
+        # Mapa: user_id -> lista de asignaciones
+        map_asignaciones = {}
+        horario_ids_involucrados = set()
+        
+        for asig in asignaciones:
+            if asig.user_id not in map_asignaciones:
+                map_asignaciones[asig.user_id] = []
+            map_asignaciones[asig.user_id].append(asig)
+            horario_ids_involucrados.add(asig.horario_id)
+            
+        # B) Obtener Segmentos de los horarios involucrados
+        segmentos = db.query(SegmentosHorario).filter(
+            SegmentosHorario.horario_id.in_(list(horario_ids_involucrados))
+        ).all()
+        
+        # Mapa: horario_id -> set de dias laborales (integers 0-6)
+        map_dias_laborables = {}
+        for seg in segmentos:
+            if seg.horario_id not in map_dias_laborables:
+                map_dias_laborables[seg.horario_id] = set()
+            map_dias_laborables[seg.horario_id].add(seg.dia_semana)
+
         # 5. Construir Estructura de Respuesta
         
         # Metadatos del mes
@@ -105,7 +148,7 @@ class ReporteService:
             columnas_dias.append({
                 "dia": d,
                 "nombre_dia": nombre_dia,
-                "es_fin_de_semana": fecha_actual.weekday() >= 4 # 5=Sabado, 6=Domingo
+                "es_fin_de_semana": fecha_actual.weekday() >= 5 # 5=Sabado, 6=Domingo
             })
 
         data_empleados = []
@@ -139,19 +182,46 @@ class ReporteService:
                     elif codigo in ["L/S", "C/S", "VAC", "PER"]:
                         stats["licencias"] += 1
                 else:
-                    # No hay registro. Validar si es fin de semana o falta.
-                    # Por defecto falta si no hay registro, o "-" si es domingo?
-                    # Según requerimiento: "Si no hay registro en un día pasado, debe marcarse como "FAL" o "-""
+                    # No hay registro. Validar si es día laboral según horario.
                     fecha_iter = date(anio, mes, d)
-                    if fecha_iter.weekday() == 6: # Domingo
-                        codigo = "D" # Domingo/Descanso
+                    
+                    # 1. Buscar horario activo en fecha_iter
+                    horario_activo_id = None
+                    # Recorrer asignaciones del empleado
+                    # Se asume que no hay solapamientos. Tomamos el primero que coincida.
+                    if emp.user_id in map_asignaciones:
+                        for asignacion in map_asignaciones[emp.user_id]:
+                            fin_valido = asignacion.fecha_fin is None or asignacion.fecha_fin >= fecha_iter
+                            inicio_valido = asignacion.fecha_inicio <= fecha_iter
+                            
+                            if inicio_valido and fin_valido:
+                                horario_activo_id = asignacion.horario_id
+                                break
+                    
+                    # 2. Verificar si es día laborable en ese horario
+                    es_dia_laborable = False
+                    if horario_activo_id and horario_activo_id in map_dias_laborables:
+                        dias_lab_set = map_dias_laborables[horario_activo_id]
+                        dia_semana_actual = fecha_iter.weekday() # 0=Lun, 6=Dom
+                        if dia_semana_actual in dias_lab_set:
+                            es_dia_laborable = True
+                    
+                    # 3. Determinar estado
+                    # Si no tiene horario asignado, asumimos que no trabaja => Descanso (D)
+                    # Si tiene horario y es día laborable => FALTA
+                    # Si tiene horario y NO es día laborable => Descanso (D)
+                    
+                    if fecha_iter > date.today():
+                        codigo = "" # Futuro
+                    elif es_dia_laborable:
+                        codigo = "FAL"
+                        stats["faltas"] += 1
                     else:
-                         # Revisar si fecha_iter > hoy (futuro)
-                        if fecha_iter > date.today():
-                            codigo = "" # Futuro
-                        else:
-                            codigo = "FAL"
-                            stats["faltas"] += 1
+                        # Usar inicial del día para Descanso/No Laborable
+                        # 0=L, 1=M, 2=M, 3=J, 4=V, 5=S, 6=D
+                        iniciales_dias = ["L", "M", "M", "J", "V", "S", "D"]
+                        dia_semana_actual = fecha_iter.weekday()
+                        codigo = iniciales_dias[dia_semana_actual]
                 
                 asistencia_dias.append(codigo)
             
