@@ -7,8 +7,10 @@ const { authenticate } = require('../middlewares/auth.js');
 router.use(authenticate);
 
 router.get('/', userController.getAll);
+router.get('/usuario/:usuario', userController.getByUsername);
 router.get('/:id', userController.getById);
 router.post('/', userController.create);
+router.put('/usuario/:usuario', userController.updateByUsername);
 router.put('/:id', userController.update);
 router.delete('/:id', userController.delete);
 

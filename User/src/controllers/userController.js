@@ -134,6 +134,36 @@ class UserController {
      * - 400: Usuario o correo ya existe
      * - 400: Datos inválidos
      */
+    // ============================================
+    // MÉTODO: getByUsername
+    // ============================================
+    /**
+     * Obtiene un usuario específico por su nombre de usuario
+     * 
+     * RUTA: GET /api/users/usuario/:usuario
+     * ACCESO: Privado (requiere token JWT válido)
+     * 
+     * PARÁMETROS URL:
+     * - usuario: nombre de usuario a buscar
+     * 
+     * RESPUESTA EXITOSA (200):
+     * {
+     *   "success": true,
+     *   "data": { ... }
+     * }
+     * 
+     * ERRORES POSIBLES:
+     * - 404: Usuario no encontrado
+     */
+    async getByUsername(req, res) {
+        try {
+            const user = await userService.getUserByUsername(req.params.usuario);
+            res.status(200).json({ success: true, data: user });
+        } catch (error) {
+            res.status(404).json({ success: false, message: error.message });
+        }
+    }
+
     async create(req, res) {
         try {
             const user = await userService.createUser(req.body);
@@ -183,6 +213,29 @@ class UserController {
     async update(req, res) {
         try {
             const user = await userService.updateUser(req.params.id, req.body);
+            res.status(200).json({ success: true, data: user });
+        } catch (error) {
+            res.status(400).json({ success: false, message: error.message });
+        }
+    }
+
+    // ============================================
+    // MÉTODO: updateByUsername
+    // ============================================
+    /**
+     * Actualiza un usuario existente buscando por nombre de usuario
+     * 
+     * RUTA: PUT /api/users/usuario/:usuario
+     * ACCESO: Privado (requiere token JWT válido)
+     * 
+     * PARÁMETROS URL:
+     * - usuario: nombre de usuario a buscar
+     * 
+     * BODY ESPERADO: Ver update()
+     */
+    async updateByUsername(req, res) {
+        try {
+            const user = await userService.updateUserByUsername(req.params.usuario, req.body);
             res.status(200).json({ success: true, data: user });
         } catch (error) {
             res.status(400).json({ success: false, message: error.message });

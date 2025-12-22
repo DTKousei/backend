@@ -22,6 +22,7 @@
 // ============================================
 
 const authService = require('../services/authService.js');
+const userService = require('../services/userService.js');
 
 class AuthController {
   // ============================================
@@ -191,6 +192,55 @@ class AuthController {
       res.status(400).json({
         success: false,
         message: error.message || 'Error al cambiar contraseña'
+      });
+    }
+  }
+
+  // ============================================
+  // MÉTODO: resetPasswordByUsername
+  // ============================================
+  /**
+   * Restablece la contraseña de un usuario a un valor por defecto (Ugel + usuario + @)
+   * 
+   * RUTA: POST /api/auth/change-pass/:usuario
+   * ACCESO: Privado (requiere token JWT válido)
+   * 
+   * PARÁMETROS URL:
+   * - usuario: nombre de usuario (DNI) al que se le reseteará la contraseña
+   * 
+   * PROCESO:
+   * 1. Genera la nueva contraseña con el patrón: Ugel{usuario}@
+   *    Ejemplo: Si usuario=75143365 -> Pass=Ugel75143365@
+   * 2. Actualiza la contraseña en la base de datos usando userService
+   * 
+   * RESPUESTA EXITOSA (200):
+   * {
+   *   "success": true,
+   *   "message": "Contraseña restablecida exitosamente",
+   *   "data": { ... }
+   * }
+   * 
+   * ERRORES POSIBLES:
+   * - 400: Error al actualizar (ej: usuario no encontrado)
+   */
+  async resetPasswordByUsername(req, res) {
+    try {
+      const { usuario } = req.params;
+      const nuevaContrasena = `Ugel${usuario}@`;
+
+      const result = await userService.updateUserByUsername(usuario, {
+        contrasena: nuevaContrasena
+      });
+
+      res.status(200).json({
+        success: true,
+        message: `Contraseña restablecida exitosamente a: ${nuevaContrasena}`,
+        data: result
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error.message || 'Error al restablecer contraseña'
       });
     }
   }

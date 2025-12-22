@@ -60,6 +60,17 @@ router.post(
 );
 
 /**
+ * @route   POST /api/auth/change-pass/:usuario
+ * @desc    Restablecer contraseña de usuario (Admin)
+ * @access  Private
+ */
+router.post(
+  '/change-pass/:usuario',
+  authenticate,
+  authController.resetPasswordByUsername
+);
+
+/**
  * @route   GET /api/auth/profile
  * @desc    Obtener perfil del usuario
  * @access  Private
