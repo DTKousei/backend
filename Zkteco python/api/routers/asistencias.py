@@ -12,7 +12,8 @@ from schemas.asistencia import (
     AsistenciaResponse,
     AsistenciaFilter,
     AsistenciaSincronizacion,
-    AsistenciaDiariaResponse
+    AsistenciaDiariaResponse,
+    AsistenciaManualCreate
 )
 from services.asistencia_service import AsistenciaService
 
@@ -123,6 +124,25 @@ def sincronizar_todos_dispositivos(db: Session = Depends(get_db)):
         "total_dispositivos": len(dispositivos),
         "resultados": resultados
     }
+
+@router.post("/registrar", response_model=AsistenciaResponse, status_code=status.HTTP_201_CREATED)
+def registrar_asistencia_manual(
+    datos: AsistenciaManualCreate,
+    db: Session = Depends(get_db)
+):
+    """
+    Registra manualmente una entrada o salida:
+    - ENTRADA: Valida que no exista entrada previa sin cerrar.
+    - SALIDA: Valida que exista una entrada abierta.
+    """
+    try:
+        return AsistenciaService.registrar_manual(db, datos)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
 
 
 @router.delete("/{dispositivo_id}/limpiar")

@@ -63,3 +63,13 @@ class AsistenciaDiariaResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+
+class TipoAsistencia(str):
+    ENTRADA = "ENTRADA"
+    SALIDA = "SALIDA"
+
+class AsistenciaManualCreate(BaseModel):
+    tipo: str = Field(..., description="Tipo de marcación: 'ENTRADA' o 'SALIDA'")
+    empleado_id: str = Field(..., description="ID del empleado")
+    fecha_hora: datetime = Field(..., description="Fecha y hora del registro")
