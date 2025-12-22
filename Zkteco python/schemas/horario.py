@@ -71,6 +71,10 @@ class AsignacionHorarioResponse(AsignacionHorarioBase):
     class Config:
         from_attributes = True
 
+class AsignacionHorarioDetailResponse(AsignacionHorarioResponse):
+    horario: HorarioResponse
+
+
 from datetime import date
 
 # Schemas para Feriados

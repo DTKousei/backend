@@ -84,7 +84,7 @@ def eliminar_horario(horario_id: int, db: Session = Depends(get_db)):
 
 
 # Endpoints para Segmentos
-from schemas.horario import SegmentoHorarioCreate, SegmentoHorarioResponse, AsignacionHorarioCreate, AsignacionHorarioResponse, SegmentoHorarioBulkCreate, FeriadoCreate, FeriadoResponse
+from schemas.horario import SegmentoHorarioCreate, SegmentoHorarioResponse, AsignacionHorarioCreate, AsignacionHorarioResponse, SegmentoHorarioBulkCreate, FeriadoCreate, FeriadoResponse, AsignacionHorarioDetailResponse
 
 @router.post("/segmentos/", response_model=SegmentoHorarioResponse, status_code=status.HTTP_201_CREATED)
 def crear_segmento(segmento: SegmentoHorarioCreate, db: Session = Depends(get_db)):
@@ -111,7 +111,13 @@ def eliminar_segmento(segmento_id: int, db: Session = Depends(get_db)):
 @router.post("/asignar", response_model=AsignacionHorarioResponse)
 def asignar_horario(asignacion: AsignacionHorarioCreate, db: Session = Depends(get_db)):
     # Validar fechas logic? Dejamos que el service o BD manejen por ahora
+    # Validar fechas logic? Dejamos que el service o BD manejen por ahora
     return HorarioService.asignar_horario(db, asignacion)
+
+@router.get("/asignaciones/usuario/{user_id}", response_model=List[AsignacionHorarioDetailResponse])
+def listar_asignaciones_usuario(user_id: str, db: Session = Depends(get_db)):
+    return HorarioService.obtener_asignaciones_por_usuario(db, user_id)
+
 
 
 # Endpoints para Feriados

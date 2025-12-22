@@ -88,6 +88,11 @@ class HorarioService:
         db.refresh(db_asignacion)
         return db_asignacion
 
+    @staticmethod
+    def obtener_asignaciones_por_usuario(db: Session, user_id: str) -> List[AsignacionHorario]:
+        return db.query(AsignacionHorario).filter(AsignacionHorario.user_id == user_id).all()
+
+
     
     @staticmethod
     def obtener_horario(db: Session, horario_id: int) -> Optional[Horario]:
