@@ -35,7 +35,7 @@ app.add_middleware(
 )
 
 # Importar routers
-from api.routers import dispositivos, usuarios, asistencias, horarios, sincronizacion, reportes
+from api.routers import dispositivos, usuarios, asistencias, horarios, sincronizacion, reportes, departamentos
 
 # Incluir routers
 app.include_router(dispositivos.router)
@@ -44,6 +44,7 @@ app.include_router(asistencias.router)
 app.include_router(horarios.router)
 app.include_router(sincronizacion.router)
 app.include_router(reportes.router)
+app.include_router(departamentos.router)
 
 
 @app.on_event("startup")

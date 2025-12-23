@@ -45,7 +45,7 @@ class UsuarioService:
             dispositivo_id=usuario.dispositivo_id,
             email=usuario.email,
             telefono=usuario.telefono,
-            departamento=usuario.departamento,
+            departamento_id=usuario.departamento_id,
             cargo=usuario.cargo,
             fecha_nacimiento=usuario.fecha_nacimiento,
             direccion=usuario.direccion,

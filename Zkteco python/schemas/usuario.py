@@ -17,7 +17,10 @@ class UsuarioBase(BaseModel):
     grupo: Optional[str] = Field(None, max_length=20, description="ID del grupo")
     email: Optional[EmailStr] = Field(None, description="Email del usuario")
     telefono: Optional[str] = Field(None, max_length=20, description="Teléfono")
-    departamento: Optional[str] = Field(None, max_length=100, description="Departamento")
+    
+    # Campo actualizado: de departamento (str) a departamento_id (int)
+    departamento_id: Optional[int] = Field(None, description="ID del Departamento")
+    
     cargo: Optional[str] = Field(None, max_length=100, description="Cargo")
     
     # Nuevos campos
@@ -39,7 +42,9 @@ class UsuarioUpdate(BaseModel):
     grupo: Optional[str] = Field(None, max_length=20)
     email: Optional[EmailStr] = None
     telefono: Optional[str] = Field(None, max_length=20)
-    departamento: Optional[str] = Field(None, max_length=100)
+    
+    departamento_id: Optional[int] = None
+    
     cargo: Optional[str] = Field(None, max_length=100)
     
     # Nuevos campos

@@ -32,7 +32,10 @@ class Usuario(Base):
     # Información adicional
     email = Column(String(100), comment="Email del usuario")
     telefono = Column(String(20), comment="Teléfono del usuario")
-    departamento = Column(String(100), comment="Departamento")
+    
+    # Relación con Departamento
+    departamento_id = Column(Integer, ForeignKey("departamentos.id", ondelete="SET NULL"), nullable=True, comment="ID del departamento")
+    
     cargo = Column(String(100), comment="Cargo o posición")
     
     # Nuevos campos
@@ -47,6 +50,10 @@ class Usuario(Base):
     # Relaciones
     dispositivo = relationship("Dispositivo", back_populates="usuarios")
     asistencias = relationship("Asistencia", back_populates="usuario", cascade="all, delete-orphan")
+    
+    # Relaciones de Departamento
+    departamento_rel = relationship("Departamento", foreign_keys=[departamento_id], back_populates="usuarios")
+    departamentos_a_cargo = relationship("Departamento", foreign_keys="[Departamento.jefe_id]", back_populates="jefe")
     
     def __repr__(self):
         return f"<Usuario(id={self.id}, user_id='{self.user_id}', nombre='{self.nombre}')>"
@@ -63,7 +70,7 @@ class Usuario(Base):
             "dispositivo_id": self.dispositivo_id,
             "email": self.email,
             "telefono": self.telefono,
-            "departamento": self.departamento,
+            "departamento_id": self.departamento_id,
             "cargo": self.cargo,
             "fecha_creacion": self.fecha_creacion.isoformat() if self.fecha_creacion else None,
             "fecha_actualizacion": self.fecha_actualizacion.isoformat() if self.fecha_actualizacion else None,

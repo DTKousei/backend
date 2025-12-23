@@ -58,6 +58,8 @@ def init_db():
         raise
 
 
+from sqlalchemy import text
+
 def drop_db():
     """
     Elimina todas las tablas de la base de datos.
@@ -65,7 +67,32 @@ def drop_db():
     """
     try:
         logger.warning("Eliminando todas las tablas de la base de datos...")
-        Base.metadata.drop_all(bind=engine)
+        # Deshabilitar checks de FK para permitir eliminación en cualquier orden
+        with engine.connect() as connection:
+            connection.execute(text("SET FOREIGN_KEY_CHECKS = 0;"))
+            connection.commit()
+            
+            # Explicit drop to avoid metadata issues
+            tables = [
+                "asistencias",
+                "asistencia_diaria",
+                "asignacion_horario",
+                "segmentos_horario",
+                "feriados",
+                "usuarios",
+                "departamentos",
+                "dispositivos",
+                "horarios"
+            ]
+            drop_stmt = f"DROP TABLE IF EXISTS {', '.join(tables)};"
+            connection.execute(text(drop_stmt))
+            
+            # Also try metadata drop for anything else
+            Base.metadata.drop_all(bind=connection)
+            
+            connection.execute(text("SET FOREIGN_KEY_CHECKS = 1;"))
+            connection.commit()
+            
         logger.info("✓ Tablas eliminadas")
     except Exception as e:
         logger.error(f"✗ Error al eliminar tablas: {str(e)}")

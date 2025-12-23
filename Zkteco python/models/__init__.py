@@ -10,6 +10,7 @@ from models.asistencia import Asistencia
 from models.horario import Horario
 from models.turnos import SegmentosHorario, AsignacionHorario, Feriados
 from models.reportes import AsistenciaDiaria
+from models.departamento import Departamento
 
 __all__ = [
     "Base",
@@ -24,4 +25,5 @@ __all__ = [
     "AsignacionHorario",
     "Feriados",
     "AsistenciaDiaria",
+    "Departamento",
 ]
