@@ -362,6 +362,23 @@ export const firmarPermiso = async (req, res, next) => {
       [`${campoFirma}_en`]: new Date()
     };
 
+    // Actualizar estados intermedios
+    if (tipo_firma === TIPO_FIRMA.JEFE_AREA) {
+      const estadoJefe = await prisma.estado.findFirst({ 
+        where: { codigo: ESTADO_PERMISO.APROBADO_JEFE } 
+      });
+      if (estadoJefe) {
+        dataActualizacion.estado_id = estadoJefe.id;
+      }
+    } else if (tipo_firma === TIPO_FIRMA.RRHH) {
+      const estadoRRHH = await prisma.estado.findFirst({ 
+        where: { codigo: ESTADO_PERMISO.APROBADO_RRHH } 
+      });
+      if (estadoRRHH) {
+        dataActualizacion.estado_id = estadoRRHH.id;
+      }
+    }
+
     // Actualizar estado si todas las firmas están completas
     const permisoConNuevaFirma = { ...permiso, ...dataActualizacion };
     const validacionFirmas = validarFirmasRequeridas(
@@ -419,8 +436,35 @@ export const generarPDF = async (req, res, next) => {
       throw new AppError(ERROR_MESSAGES.PERMISO_NOT_FOUND, 404);
     }
 
+    // Obtener datos externos del empleado
+    const empleadoInfo = {};
+    try {
+      // Usamos fetch nativo (Node 18+)
+      const [userRes, deptoRes] = await Promise.all([
+        fetch(`http://localhost:8000/api/usuarios/user_id/${permiso.empleado_id}`).catch(err => ({ ok: false, err })),
+        fetch(`http://localhost:8000/api/departamentos/usuario/${permiso.empleado_id}`).catch(err => ({ ok: false, err }))
+      ]);
+
+      if (userRes.ok) {
+        const userData = await userRes.json();
+        // Soporte para diferentes estructuras de respuesta
+        const user = userData.data || userData;
+        empleadoInfo.nombre = user.nombre_completo || 
+                            (user.nombres ? `${user.nombres} ${user.apellidos || ''}`.trim() : null) || 
+                            user.nombre;
+      }
+
+      if (deptoRes.ok) {
+        const deptoData = await deptoRes.json();
+        const depto = deptoData.data || deptoData;
+        empleadoInfo.area = depto.nombre || depto.nombre_departamento || depto.departamento;
+      }
+    } catch (error) {
+      console.error('Error obteniendo datos externos para PDF:', error);
+    }
+
     // Generar PDF
-    const resultadoPDF = await generarPDFPapeleta(permiso, permiso.tipo_permiso);
+    const resultadoPDF = await generarPDFPapeleta(permiso, permiso.tipo_permiso, empleadoInfo);
 
     // Actualizar permiso con ruta del PDF
     await prisma.permiso.update({
