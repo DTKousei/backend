@@ -12,7 +12,7 @@ const __dirname = path.dirname(__filename);
 /**
  * Genera un PDF de la papeleta con todas las firmas usando Puppeteer
  */
-export const generarPDFPapeleta = async (permiso, tipoPermiso, empleadoInfo = {}) => {
+export const generarPDFPapeleta = async (permiso, tipoPermiso, empleadoInfo = {}, nombreArchivoPersonalizado = null) => {
   let browser;
   try {
     // Lanzar navegador
@@ -384,7 +384,7 @@ export const generarPDFPapeleta = async (permiso, tipoPermiso, empleadoInfo = {}
     await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
 
     // Generar nombre de archivo
-    const nombreArchivo = generarNombreArchivo('papeleta', 'pdf');
+    const nombreArchivo = nombreArchivoPersonalizado || generarNombreArchivo('papeleta', 'pdf');
     const rutaArchivo = path.join(__dirname, '../../generated', nombreArchivo);
 
     // Asegurar directorio

@@ -7,11 +7,13 @@ import {
   eliminarPermiso,
   firmarPermiso,
   generarPDF,
-  cargarPDFFirmado
+  cargarPDFFirmado,
+  verPDF
 } from '../controllers/permiso.controller.js';
 import {
   firmarPermisoDigital,
-  verificarFirmaDigital
+  verificarFirmaDigital,
+  recibirCallbackRefirma
 } from '../controllers/permisoDigital.controller.js';
 import {
   validateCreatePermiso,
@@ -42,6 +44,12 @@ router.get('/:id', validateUUID, obtenerPermisoPorId);
  * @desc    Crear un nuevo permiso
  */
 router.post('/', validateCreatePermiso, crearPermiso);
+
+/**
+ * @route   POST /api/permisos/callback
+ * @desc    Recepción de PDF firmado desde ReFirma (ONPE)
+ */
+router.post('/callback', upload.single('Filename'), recibirCallbackRefirma);
 
 /**
  * @route   PUT /api/permisos/:id
@@ -80,6 +88,12 @@ router.get('/:id/verificar-firma/:tipoFirma', validateUUID, verificarFirmaDigita
  * @desc    Generar y descargar PDF del permiso
  */
 router.get('/:id/pdf', validateUUID, generarPDF);
+
+/**
+ * @route   GET /api/permisos/:id/pdf/ver
+ * @desc    Ver PDF del permiso en el navegador (evita regenerarlo si existe)
+ */
+router.get('/:id/pdf/ver', validateUUID, verPDF);
 
 /**
  * @route   POST /api/permisos/:id/upload-pdf
