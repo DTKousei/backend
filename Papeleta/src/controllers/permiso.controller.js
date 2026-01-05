@@ -1,6 +1,6 @@
 import prisma from '../config/database.js';
 import { AppError } from '../middleware/error.middleware.js';
-import { ERROR_MESSAGES, SUCCESS_MESSAGES, ESTADO_PERMISO, METODO_FIRMA } from '../utils/constants.js';
+import { ERROR_MESSAGES, SUCCESS_MESSAGES, ESTADO_PERMISO, METODO_FIRMA, TIPO_FIRMA } from '../utils/constants.js';
 import { calcularHoraSalida, validarTiempoPermiso } from '../services/horario.service.js';
 import { validarOrdenFirma, validarFirmasRequeridas } from '../services/firma.service.js';
 import { generarPDFPapeleta } from '../services/pdf.service.js';
@@ -406,6 +406,54 @@ export const firmarPermiso = async (req, res, next) => {
       }
     });
 
+    // --- REGENERAR PDF CON LA NUEVA FIRMA ---
+    try {
+      // 1. Obtener datos externos del empleado (Misma lógica que generarPDF)
+       const empleadoInfo = {};
+       try {
+         const [userRes, deptoRes] = await Promise.all([
+           fetch(`http://localhost:8000/api/usuarios/user_id/${permiso.empleado_id}`).catch(err => ({ ok: false, err })),
+           fetch(`http://localhost:8000/api/departamentos/usuario/${permiso.empleado_id}`).catch(err => ({ ok: false, err }))
+         ]);
+   
+         if (userRes.ok) {
+           const userData = await userRes.json();
+           const user = userData.data || userData;
+           empleadoInfo.nombre = user.nombre_completo || 
+                               (user.nombres ? `${user.nombres} ${user.apellidos || ''}`.trim() : null) || 
+                               user.nombre;
+         }
+   
+         if (deptoRes.ok) {
+           const deptoData = await deptoRes.json();
+           const depto = deptoData.data || deptoData;
+           empleadoInfo.area = depto.nombre || depto.nombre_departamento || depto.departamento;
+         }
+       } catch (errorExterno) {
+         console.error('Error obteniendo datos externos para regenerar PDF:', errorExterno);
+       }
+   
+       // 2. Generar PDF
+       // Usamos permisoActualizado para que tenga la firma recién guardada
+       const resultadoPDF = await generarPDFPapeleta(permisoActualizado, permisoActualizado.tipo_permiso, empleadoInfo);
+   
+       // 3. Actualizar ruta en BD
+       await prisma.permiso.update({
+        where: { id },
+        data: {
+          pdf_generado_path: resultadoPDF.rutaRelativa
+        }
+      });
+      
+      // Actualizar también el objeto de respuesta
+      permisoActualizado.pdf_generado_path = resultadoPDF.rutaRelativa;
+
+    } catch (pdfError) {
+      console.error('Error regenerando PDF al firmar:', pdfError);
+      // No bloqueamos la respuesta de éxito de la firma, pero logueamos el error
+    }
+    // ----------------------------------------
+
     res.json({
       success: true,
       message: SUCCESS_MESSAGES.FIRMA_REGISTRADA,
@@ -618,6 +666,54 @@ export const cargarPDFFirmado = async (req, res, next) => {
         ruta: rutaRelativa,
         tamano: req.file.size
       }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Rechazar un permiso
+ */
+export const rechazarPermiso = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    // Podríamos recibir una observación si el modelo lo soportara
+    // const { observacion } = req.body; 
+
+    const permiso = await prisma.permiso.findUnique({
+      where: { id }
+    });
+
+    if (!permiso) {
+      throw new AppError(ERROR_MESSAGES.PERMISO_NOT_FOUND, 404);
+    }
+
+    // Buscar estado RECHAZADO
+    const estadoRechazado = await prisma.estado.findFirst({
+        where: { codigo: ESTADO_PERMISO.RECHAZADO }
+    });
+
+    if (!estadoRechazado) {
+        throw new AppError(ERROR_MESSAGES.ESTADO_NOT_FOUND, 404);
+    }
+
+    const permisoActualizado = await prisma.permiso.update({
+      where: { id },
+      data: {
+        estado_id: estadoRechazado.id
+        // si hubiera campo observacion: observacion_rechazo: observacion
+      },
+      include: {
+        tipo_permiso: true,
+        estado: true
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Permiso rechazado exitosamente',
+      data: permisoActualizado
     });
   } catch (error) {
     next(error);

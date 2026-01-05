@@ -4,6 +4,13 @@ import { ERROR_MESSAGES, ESTADO_PERMISO, METODO_FIRMA, SUCCESS_MESSAGES } from '
 import { validarOrdenFirma, validarFirmasRequeridas } from '../services/firma.service.js';
 import { validarFirmaCompleta, generarHashDocumento } from '../services/firmaOnpe.service.js';
 import { generarQRVerificacion } from '../services/qr.service.js';
+import { generarPDFPapeleta } from '../services/pdf.service.js';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Firmar permiso con firma digital ONPE
@@ -95,6 +102,43 @@ export const firmarPermisoDigital = async (req, res, next) => {
         estado: true
       }
     });
+
+    // --- REGENERAR PDF CON LA NUEVA FIRMA ---
+    try {
+      const empleadoInfo = {};
+      try {
+        const [userRes, deptoRes] = await Promise.all([
+          fetch(`http://localhost:8000/api/usuarios/user_id/${permiso.empleado_id}`).catch(err => ({ ok: false, err })),
+          fetch(`http://localhost:8000/api/departamentos/usuario/${permiso.empleado_id}`).catch(err => ({ ok: false, err }))
+        ]);
+        if (userRes.ok) {
+          const userData = await userRes.json();
+          const user = userData.data || userData;
+          empleadoInfo.nombre = user.nombre_completo || 
+                              (user.nombres ? `${user.nombres} ${user.apellidos || ''}`.trim() : null) || 
+                              user.nombre;
+        }
+        if (deptoRes.ok) {
+          const deptoData = await deptoRes.json();
+          const depto = deptoData.data || deptoData;
+          empleadoInfo.area = depto.nombre || depto.nombre_departamento || depto.departamento;
+        }
+      } catch (errorExterno) {
+        console.error('Error obteniendo datos externos:', errorExterno);
+      }
+
+      const resultadoPDF = await generarPDFPapeleta(permisoActualizado, permisoActualizado.tipo_permiso, empleadoInfo);
+      
+      await prisma.permiso.update({
+        where: { id },
+        data: { pdf_generado_path: resultadoPDF.rutaRelativa }
+      });
+      permisoActualizado.pdf_generado_path = resultadoPDF.rutaRelativa;
+      
+    } catch (pdfError) {
+      console.error('Error regenerando PDF (Firma Digital):', pdfError);
+    }
+    // ----------------------------------------
 
     res.json({
       success: true,
@@ -355,5 +399,116 @@ export const firmarPermisoTradicional = async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+  }
+};
+
+/**
+ * Descargar PDF para ReFirma (Endpoint público/simplificado - Firma ONPE)
+ * Retorna el PDF binario para que la aplicación Desktop lo pueda abrir.
+ */
+export const descargarPDFFirmaOnpe = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    console.log(`[Firma ONPE] Solicitud de PDF para ID: ${id}`);
+
+    const permiso = await prisma.permiso.findUnique({
+      where: { id },
+      include: {
+        tipo_permiso: true,
+        estado: true
+      }
+    });
+
+    if (!permiso) {
+      return res.status(404).send('Permiso no encontrado');
+    }
+
+    let rutaArchivo = null;
+    let nombreArchivo = `papeleta_${id.substring(0, 8)}.pdf`;
+
+    // Helper para limpiar ruta (quitar slash inicial si existe para path.join seguro)
+    const cleanPath = (p) => p.startsWith('/') || p.startsWith('\\') ? p.substring(1) : p;
+
+    // 1. Buscar PDF firmado
+    if (permiso.pdf_firmado_path) {
+        // Asegurar que usamos path correcto relativo al root del proyecto
+        // __dirname es src/controllers. ../../ es root.
+        const p = cleanPath(permiso.pdf_firmado_path);
+        const ruta = path.join(__dirname, '../../', p);
+        if (fs.existsSync(ruta)) rutaArchivo = ruta;
+    }
+
+    // 2. Buscar PDF generado previamente
+    if (!rutaArchivo && permiso.pdf_generado_path) {
+        const p = cleanPath(permiso.pdf_generado_path);
+        const ruta = path.join(__dirname, '../../', p);
+        if (fs.existsSync(ruta)) rutaArchivo = ruta;
+    }
+
+    // 3. Generar PDF al vuelo si no existe
+    if (!rutaArchivo) {
+        console.log(`[Firma ONPE] Generando PDF al vuelo para ${id}...`);
+        
+        const empleadoInfo = {};
+        try {
+            const [userRes, deptoRes] = await Promise.all([
+                fetch(`http://localhost:8000/api/usuarios/user_id/${permiso.empleado_id}`).catch(e => ({ok:false})),
+                fetch(`http://localhost:8000/api/departamentos/usuario/${permiso.empleado_id}`).catch(e => ({ok:false}))
+            ]);
+            
+            if (userRes.ok) {
+                const userData = await userRes.json();
+                const user = userData.data || userData;
+                empleadoInfo.nombre = user.nombre_completo || 
+                                    (user.nombres ? `${user.nombres} ${user.apellidos || ''}`.trim() : null) || 
+                                    user.nombre;
+            }
+            if (deptoRes.ok) {
+                const deptoData = await deptoRes.json();
+                const depto = deptoData.data || deptoData;
+                empleadoInfo.area = depto.nombre || depto.nombre_departamento || depto.departamento;
+            }
+        } catch (error) {
+            console.error('[Firma ONPE] Error obteniendo datos externos:', error);
+        }
+
+        try {
+            const resultado = await generarPDFPapeleta(permiso, permiso.tipo_permiso, empleadoInfo);
+            rutaArchivo = resultado.ruta;
+            
+            await prisma.permiso.update({
+                where: { id },
+                data: { pdf_generado_path: resultado.rutaRelativa }
+            });
+        } catch (genError) {
+             console.error('[Firma ONPE] Error generando PDF con puppeteer:', genError);
+             return res.status(500).send('Error generando el documento PDF');
+        }
+    }
+
+    if (!rutaArchivo || !fs.existsSync(rutaArchivo)) {
+        return res.status(404).send('Archivo PDF no disponible');
+    }
+
+    console.log(`[Firma ONPE] Sirviendo archivo: ${rutaArchivo}`);
+    
+    // Obtener tamaño para Content-Length
+    const stat = fs.statSync(rutaArchivo);
+
+    res.writeHead(200, {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename="${nombreArchivo}"`,
+        'Content-Length': stat.size
+    });
+    
+    const readStream = fs.createReadStream(rutaArchivo);
+    readStream.pipe(res);
+
+  } catch (error) {
+    console.error('[Firma ONPE] Error crítico:', error);
+    if (!res.headersSent) {
+        res.status(500).send('Error interno del servidor');
+    }
   }
 };

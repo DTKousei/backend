@@ -383,13 +383,25 @@ export const generarPDFPapeleta = async (permiso, tipoPermiso, empleadoInfo = {}
 
     await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
 
-    // Generar nombre de archivo
-    const nombreArchivo = nombreArchivoPersonalizado || generarNombreArchivo('papeleta', 'pdf');
-    const rutaArchivo = path.join(__dirname, '../../generated', nombreArchivo);
+    // Generar nombre de archivo (Usar correlativo corto)
+    const nombreArchivo = `papeleta_${permiso.id.substring(0, 8)}.pdf`;
+    
+    // Ruta de salida normalizada
+    const relativeDir = 'generated'; 
+    const outputDir = path.join(__dirname, '../../', relativeDir);
 
     // Asegurar directorio
-    if (!fs.existsSync(path.dirname(rutaArchivo))) {
-      fs.mkdirSync(path.dirname(rutaArchivo), { recursive: true });
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
+    const rutaArchivo = path.join(outputDir, nombreArchivo);
+
+    // Eliminar si existe para evitar problemas de permisos o bloqueos
+    if (fs.existsSync(rutaArchivo)) {
+        try {
+            fs.unlinkSync(rutaArchivo);
+        } catch(e) { console.error('Error eliminando archivo previo:', e); }
     }
 
     await page.pdf({

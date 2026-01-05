@@ -8,12 +8,14 @@ import {
   firmarPermiso,
   generarPDF,
   cargarPDFFirmado,
-  verPDF
+  verPDF,
+  rechazarPermiso
 } from '../controllers/permiso.controller.js';
 import {
   firmarPermisoDigital,
   verificarFirmaDigital,
-  recibirCallbackRefirma
+  recibirCallbackRefirma,
+  descargarPDFFirmaOnpe
 } from '../controllers/permisoDigital.controller.js';
 import {
   validateCreatePermiso,
@@ -64,6 +66,12 @@ router.put('/:id', validateUUID, validateUpdatePermiso, actualizarPermiso);
 router.delete('/:id', validateUUID, eliminarPermiso);
 
 /**
+ * @route   PATCH /api/permisos/:id/rechazar
+ * @desc    Rechazar un permiso
+ */
+router.patch('/:id/rechazar', validateUUID, rechazarPermiso);
+
+/**
  * @route   PATCH /api/permisos/:id/firmar
  * @desc    Agregar firma tradicional (base64) a un permiso
  * @body    tipo_firma (solicitante|jefe_area|rrhh|institucion), firma (base64)
@@ -82,6 +90,12 @@ router.patch('/:id/firmar-digital', validateUUID, validateFirmaDigital, firmarPe
  * @desc    Verificar firma digital de un permiso
  */
 router.get('/:id/verificar-firma/:tipoFirma', validateUUID, verificarFirmaDigital);
+
+/**
+ * @route   GET /api/permisos/:id/firma-onpe-pdf
+ * @desc    Endpoint público para descarga de PDF por Firma ONPE (sin Auth)
+ */
+router.get('/:id/firma-onpe-pdf', descargarPDFFirmaOnpe);
 
 /**
  * @route   GET /api/permisos/:id/pdf
