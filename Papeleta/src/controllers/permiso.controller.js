@@ -719,3 +719,57 @@ export const rechazarPermiso = async (req, res, next) => {
     next(error);
   }
 };
+/**
+ * Cambiar estado de un permiso (Genérico)
+ * Permite cambiar a cualquier estado por ID o código
+ */
+export const cambiarEstadoPermiso = async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const { estado_id, codigo_estado } = req.body;
+  
+      if (!estado_id && !codigo_estado) {
+          throw new AppError('Se requiere estado_id o codigo_estado', 400);
+      }
+  
+      const permiso = await prisma.permiso.findUnique({
+        where: { id }
+      });
+  
+      if (!permiso) {
+        throw new AppError(ERROR_MESSAGES.PERMISO_NOT_FOUND, 404);
+      }
+  
+      let nuevoEstadoId = estado_id;
+  
+      // Si pasan código, buscamos el ID
+      if (!nuevoEstadoId && codigo_estado) {
+          const estado = await prisma.estado.findUnique({
+              where: { codigo: codigo_estado }
+          });
+          if (!estado) {
+              throw new AppError(ERROR_MESSAGES.ESTADO_NOT_FOUND, 404);
+          }
+          nuevoEstadoId = estado.id;
+      }
+  
+      const permisoActualizado = await prisma.permiso.update({
+        where: { id },
+        data: {
+          estado_id: nuevoEstadoId
+        },
+        include: {
+          tipo_permiso: true,
+          estado: true
+        }
+      });
+  
+      res.json({
+        success: true,
+        message: 'Estado del permiso actualizado correctamente',
+        data: permisoActualizado
+      });
+    } catch (error) {
+      next(error);
+    }
+  };

@@ -9,7 +9,8 @@ import {
   generarPDF,
   cargarPDFFirmado,
   verPDF,
-  rechazarPermiso
+  rechazarPermiso,
+  cambiarEstadoPermiso
 } from '../controllers/permiso.controller.js';
 import {
   firmarPermisoDigital,
@@ -70,6 +71,13 @@ router.delete('/:id', validateUUID, eliminarPermiso);
  * @desc    Rechazar un permiso
  */
 router.patch('/:id/rechazar', validateUUID, rechazarPermiso);
+
+/**
+ * @route   PATCH /api/permisos/:id/estado
+ * @desc    Cambiar estado de un permiso (manual)
+ * @body    estado_id o codigo_estado
+ */
+router.patch('/:id/estado', validateUUID, cambiarEstadoPermiso);
 
 /**
  * @route   PATCH /api/permisos/:id/firmar
