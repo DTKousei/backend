@@ -1,4 +1,5 @@
 const prisma = require('../utils/prisma');
+const fs = require('fs');
 const { deleteFile, getFileUrl } = require('../utils/fileManager');
 
 /**
@@ -353,6 +354,40 @@ const getReporteSabana = async (req, res, next) => {
   }
 };
 
+/**
+ * Obtener documento de incidencia
+ */
+const getIncidenciaDocumento = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const incidencia = await prisma.incidencia.findUnique({
+      where: { id },
+      select: { url_documento: true }
+    });
+
+    if (!incidencia || !incidencia.url_documento) {
+      return res.status(404).json({
+        error: 'No encontrado',
+        message: 'La incidencia no tiene documento adjunto',
+      });
+    }
+
+    const filePath = incidencia.url_documento;
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({
+        error: 'No encontrado',
+        message: 'El archivo físico no existe',
+      });
+    }
+
+    res.sendFile(filePath);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createIncidencia,
   getAllIncidencias,
@@ -362,4 +397,5 @@ module.exports = {
   aprobarIncidencia,
   rechazarIncidencia,
   getReporteSabana,
+  getIncidenciaDocumento,
 };

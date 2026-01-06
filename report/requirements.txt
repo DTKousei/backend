@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+requests
+pandas
+openpyxl
+reportlab
+sqlalchemy
+mysql-connector-python
+python-dotenv
+XlsxWriter

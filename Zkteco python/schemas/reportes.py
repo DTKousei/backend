@@ -5,3 +5,4 @@ class SabanaRequest(BaseModel):
     anio: int
     mes: int
     user_ids: Optional[List[str]] = None
+    area: Optional[str] = None

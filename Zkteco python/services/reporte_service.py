@@ -58,12 +58,30 @@ class ReporteService:
         db: Session, 
         anio: int, 
         mes: int, 
-        user_ids: Optional[List[str]] = None
+        user_ids: Optional[List[str]] = None,
+        area: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Genera la data para la Sábana de Asistencia (Matrix Report).
         """
         
+        # 0. Registrar Generación de Reporte (Auditoria basica)
+        # Nota: Idealmente esto va al final o en bloque try/finally, pero para simplicidad lo registramos aqui
+        # Si no existe la tabla aun, saltar este paso. (Ya la creamos en models/reportes.py)
+        try:
+            from models.reportes import ReportesGenerados
+            nuevo_reporte = ReportesGenerados(
+                tipo_reporte="Sabana",
+                anio=anio,
+                mes=mes,
+                area=area
+            )
+            db.add(nuevo_reporte)
+            db.commit()
+        except Exception as e:
+            print(f"Advertencia: No se pudo registrar el historial de reporte: {e}")
+            db.rollback()
+
         # 1. Definir rango del mes
         _, num_dias = monthrange(anio, mes)
         fecha_inicio = date(anio, mes, 1)
@@ -71,6 +89,13 @@ class ReporteService:
         
         # 2. Obtener Empleados
         query_users = db.query(Usuario).order_by(Usuario.nombre)
+        
+        # 2.1 Filtrar por Departamento (Area)
+        if area:
+            from models.departamento import Departamento
+            # Hacemos join y filtramos por nombre de departamento
+            query_users = query_users.join(Usuario.departamento_rel).filter(Departamento.nombre == area)
+        
         if user_ids:
             query_users = query_users.filter(Usuario.user_id.in_(user_ids))
         
@@ -229,7 +254,7 @@ class ReporteService:
                 "empleado_id": emp.id,
                 "nombre": emp.nombre,
                 "user_id": emp.user_id,
-                "departamento": emp.departamento,
+                "departamento": emp.departamento_rel.nombre if emp.departamento_rel else "Sin Departamento",
                 "asistencia_dias": asistencia_dias,
                 "resumen": stats
             })

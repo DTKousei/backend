@@ -25,7 +25,8 @@ def obtener_sabana_asistencia(
             db, 
             request.anio, 
             request.mes, 
-            user_ids=request.user_ids
+            user_ids=request.user_ids,
+            area=request.area
         )
         return reporte
     except Exception as e:

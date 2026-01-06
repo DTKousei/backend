@@ -10,6 +10,7 @@ const {
   aprobarIncidencia,
   rechazarIncidencia,
   getReporteSabana,
+  getIncidenciaDocumento,
 } = require('../controllers/incidencias.controller');
 const {
   validateCreateIncidencia,
@@ -23,6 +24,7 @@ const {
 router.post('/', upload.single('documento'), validateCreateIncidencia, createIncidencia);
 router.get('/', getAllIncidencias);
 router.post('/reporte-sabana', getReporteSabana);
+router.get('/:id/documento', validateUUID, getIncidenciaDocumento);
 router.get('/:id', validateUUID, getIncidenciaById);
 router.put('/:id', upload.single('documento'), validateUpdateIncidencia, updateIncidencia);
 router.delete('/:id', validateUUID, deleteIncidencia);

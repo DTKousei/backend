@@ -2,7 +2,9 @@
 Modelos para Reportes de Asistencia
 """
 
-from sqlalchemy import Column, Integer, String, Date, Time, Boolean, Float, ForeignKey
+from sqlalchemy import Column, Integer, String, Date, Time, Boolean, Float, ForeignKey, DateTime
+from sqlalchemy.orm import relationship
+from datetime import datetime
 from models.database import Base
 
 class AsistenciaDiaria(Base):
@@ -33,3 +35,25 @@ class AsistenciaDiaria(Base):
     
     def __repr__(self):
         return f"<Reporte(user={self.user_id}, fecha={self.fecha}, estado={self.estado_asistencia})>"
+
+class ReportesGenerados(Base):
+    """
+    Tabla para el registro de reportes generados (historial).
+    """
+    __tablename__ = "reportes_generados"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    tipo_reporte = Column(String(50), nullable=False, comment="Ej: Sabana, Excel, PDF")
+    
+    # Parámetros del reporte
+    anio = Column(Integer, nullable=False)
+    mes = Column(Integer, nullable=False)
+    area = Column(String(100), nullable=True, comment="Filtro de área aplicado (si hubo)")
+    
+    # Metadatos del archivo
+    ruta_archivo = Column(String(255), nullable=True, comment="Ruta física donde se guardó (si aplica)")
+    fecha_generacion = Column(DateTime, default=datetime.now)
+    usuario_generador_id = Column(Integer, nullable=True, comment="ID del usuario admin que generó el reporte")
+
+    def __repr__(self):
+        return f"<ReporteGenerado(tipo={self.tipo_reporte}, fecha={self.fecha_generacion}, area={self.area})>"
