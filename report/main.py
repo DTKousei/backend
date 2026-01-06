@@ -23,6 +23,8 @@ app.add_middleware(
 # Incluir las rutas del módulo de reportes
 app.include_router(reports.router)
 app.include_router(report_types.router)
+from routers import attendance
+app.include_router(attendance.router)
 
 @app.on_event("startup")
 def startup_event():
