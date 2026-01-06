@@ -202,6 +202,52 @@ Endpoints para administrar los tipos de reporte disponibles en el sistema.
 
 ---
 
+### 5. Estadísticas de Asistencia (Rango de Fechas)
+
+Obtiene un resumen estadístico de asistencia (puntualidad, tardanzas, faltas, horas extras) para todos los empleados en un rango de fechas específico.
+
+- **URL**: `/api/asistencias/reporte`
+- **Método**: `GET`
+
+#### Parámetros Query
+
+| Parámetro      | Tipo   | Requerido | Descripción                             |
+| -------------- | ------ | --------- | --------------------------------------- |
+| `fecha_inicio` | string | Sí        | Fecha de inicio del rango (YYYY-MM-DD). |
+| `fecha_fin`    | string | Sí        | Fecha de fin del rango (YYYY-MM-DD).    |
+
+#### Ejemplo de Solicitud
+
+```http
+GET /api/asistencias/reporte?fecha_inicio=2026-01-01&fecha_fin=2026-01-31
+```
+
+#### Respuesta (Output)
+
+```json
+{
+  "rango": {
+    "fecha_inicio": "2026-01-01",
+    "fecha_fin": "2026-01-31"
+  },
+  "total_empleados": 45,
+  "data": [
+    {
+      "user_id": "12345678",
+      "nombre": "JUAN PEREZ",
+      "puntual": 20,
+      "tardanzas": 2,
+      "faltas": 0,
+      "horas_extras": 5,
+      "justificaciones": 1,
+      "total_dias": 31
+    }
+  ]
+}
+```
+
+---
+
 ## Ejecución
 
 Para iniciar el servicio, ejecute el script:

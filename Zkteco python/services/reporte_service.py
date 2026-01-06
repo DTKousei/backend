@@ -59,7 +59,8 @@ class ReporteService:
         anio: int, 
         mes: int, 
         user_ids: Optional[List[str]] = None,
-        area: Optional[str] = None
+        area: Optional[str] = None,
+        otros_filtros: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Genera la data para la Sábana de Asistencia (Matrix Report).
@@ -70,11 +71,13 @@ class ReporteService:
         # Si no existe la tabla aun, saltar este paso. (Ya la creamos en models/reportes.py)
         try:
             from models.reportes import ReportesGenerados
+            import json
             nuevo_reporte = ReportesGenerados(
                 tipo_reporte="Sabana",
                 anio=anio,
                 mes=mes,
-                area=area
+                area=area,
+                filtros=json.dumps(otros_filtros) if otros_filtros else None
             )
             db.add(nuevo_reporte)
             db.commit()
@@ -91,10 +94,10 @@ class ReporteService:
         query_users = db.query(Usuario).order_by(Usuario.nombre)
         
         # 2.1 Filtrar por Departamento (Area)
-        if area:
-            from models.departamento import Departamento
-            # Hacemos join y filtramos por nombre de departamento
-            query_users = query_users.join(Usuario.departamento_rel).filter(Departamento.nombre == area)
+        # CORRECCION: El area es solo referencial (metadata), no un filtro de base de datos.
+        # if area:
+        #     from models.departamento import Departamento
+        #     query_users = query_users.join(Usuario.departamento_rel).filter(Departamento.nombre == area)
         
         if user_ids:
             query_users = query_users.filter(Usuario.user_id.in_(user_ids))

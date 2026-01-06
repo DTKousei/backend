@@ -49,6 +49,8 @@ class ReportesGenerados(Base):
     anio = Column(Integer, nullable=False)
     mes = Column(Integer, nullable=False)
     area = Column(String(100), nullable=True, comment="Filtro de área aplicado (si hubo)")
+    filtros = Column(String(500), nullable=True, comment="Otros filtros en formato JSON string") # SQLite compatible
+
     
     # Metadatos del archivo
     ruta_archivo = Column(String(255), nullable=True, comment="Ruta física donde se guardó (si aplica)")

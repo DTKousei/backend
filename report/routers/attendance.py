@@ -1,7 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query
-from typing import List, Optional
-from datetime import datetime, timedelta
-from services.data_fetcher import fetch_sabana_data
+from typing import List, Optional, Dict, Any
+import requests
 import logging
 
 router = APIRouter(
@@ -13,11 +12,8 @@ router = APIRouter(
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def parse_date(date_str: str) -> datetime:
-    try:
-        return datetime.strptime(date_str, "%Y-%m-%d")
-    except ValueError:
-        raise HTTPException(status_code=400, detail=f"Formato de fecha inválido: {date_str}. Use YYYY-MM-DD")
+# URL del API externo (Main API)
+EXTERNAL_API_URL = "http://localhost:8000/api/asistencias/reporte"
 
 @router.get("/reporte")
 def get_attendance_report(
@@ -25,103 +21,96 @@ def get_attendance_report(
     fecha_fin: str = Query(..., description="Fecha de fin (YYYY-MM-DD)")
 ):
     """
-    Obtiene un reporte estadístico de asistencia para un rango de fechas.
-    Calcula puntualidad, tardanzas, faltas, horas extras y justificaciones.
+    Obtiene un reporte estadístico de asistencia consumiendo el API principal.
+    Calcula:
+    - Puntualidad (Estado 'PRESENTE')
+    - Tardanzas (Estado 'TARDANZA')
+    - Faltas (Estado 'FALTA')
+    - Horas Extras (Entero: Suma de (horas_trabajadas - horas_esperadas) > 0)
     """
-    start_date = parse_date(fecha_inicio)
-    end_date = parse_date(fecha_fin)
-    
-    if start_date > end_date:
-        raise HTTPException(status_code=400, detail="La fecha de inicio no puede ser posterior a la fecha de fin.")
+    try:
+        # 1. Consumir API Externa
+        response = requests.get(EXTERNAL_API_URL, params={
+            "fecha_inicio": fecha_inicio,
+            "fecha_fin": fecha_fin
+        })
+        response.raise_for_status()
+        records = response.json()
+        
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error consumiendo API externa: {e}")
+        raise HTTPException(status_code=503, detail=f"Error obteniendo datos de asistencia: {str(e)}")
 
-    # Identificar los meses involucrados para hacer las peticiones necesarias
-    # fetch_sabana_data requiere mes y año. Si el rango cruza meses, necesitamos llamar varias veces.
-    # Por simplicidad y eficiencia, iteraremos por cada mes único en el rango.
+    # 2. Procesar y Agrupar Datos
+    employee_stats: Dict[str, Dict[str, Any]] = {}
     
-    months_to_fetch = set()
-    curr = start_date
-    while curr <= end_date:
-        months_to_fetch.add((curr.year, curr.month))
-        # Avanzar al primer día del siguiente mes para evitar iterar día por día ineficientemente
-        if curr.month == 12:
-            curr = datetime(curr.year + 1, 1, 1)
-        else:
-            curr = datetime(curr.year, curr.month + 1, 1)
-            
-    # Estructura acumulada por empleado (clave: DNI/user_id)
-    employee_stats = {}
-    
-    # Códigos de asistencia (Basado en análisis previo)
-    CODES_PUNTUAL = ["A", "T/R"] # Asistido, Trabajo Remoto
-    CODES_TARDANZA = ["T", "TAR"] # Tardanza
-    CODES_FALTA = ["FAL", "A/B"] # Falta, Abandono
-    CODES_HORAS_EXTRAS = ["HE"] # Horas Extras
-    CODES_JUSTIFICADOS = ["C/S", "ONO", "LS/G", "P/E", "L/S", "P/I", "P/C", "P/S", "L/F", "C/J", "OMI", "JUST"]
-
-    for year, month in months_to_fetch:
-        try:
-            # Obtener datos del mes completo
-            data = fetch_sabana_data(str(month), str(year))
-            employees = data.get("data", [])
-            
-            for emp in employees:
-                user_id = emp.get("user_id")
-                
-                # Inicializar estadísticas para el empleado si es la primera vez que lo vemos
-                if user_id not in employee_stats:
-                    employee_stats[user_id] = {
-                        "user_id": user_id,
-                        "nombre": emp.get("nombre"),
-                        "puntual": 0,
-                        "tardanzas": 0,
-                        "faltas": 0,
-                        "horas_extras": 0,
-                        "justificaciones": 0,
-                        "total_dias": 0 # Días en el rango solicitado
-                    }
-                
-                asistencia_dias = emp.get("asistencia_dias", [])
-                
-                # Iterar sobre los días del mes y verificar si caen en el rango
-                # asistencia_dias es una lista donde índice 0 = día 1 del mes
-                for day_idx, status in enumerate(asistencia_dias):
-                    day_num = day_idx + 1
-                    try:
-                        current_date_check = datetime(year, month, day_num)
-                    except ValueError:
-                        continue # Día inválido (ej. 30 de febrero)
-                        
-                    # Verificar si la fecha actual está dentro del rango solicitado
-                    if start_date <= current_date_check <= end_date:
-                        stats = employee_stats[user_id]
-                        stats["total_dias"] += 1
-                        
-                        status_upper = str(status).upper().strip()
-                        
-                        if status_upper in CODES_PUNTUAL:
-                            stats["puntual"] += 1
-                        elif status_upper in CODES_TARDANZA:
-                            stats["tardanzas"] += 1
-                        elif status_upper in CODES_FALTA:
-                            stats["faltas"] += 1
-                        elif status_upper in CODES_HORAS_EXTRAS:
-                            stats["horas_extras"] += 1
-                        elif status_upper in CODES_JUSTIFICADOS:
-                            stats["justificaciones"] += 1
-                            
-        except Exception as e:
-            logger.error(f"Error procesando datos para {month}/{year}: {e}")
-            # Continuamos con el siguiente mes si falla uno
+    for record in records:
+        user_id = record.get("user_id")
+        if not user_id:
             continue
+            
+        if user_id not in employee_stats:
+            employee_stats[user_id] = {
+                "user_id": user_id,
+                # "nombre": "N/A", # El API externo no parece devolver nombre en el ejemplo
+                "puntual": 0,
+                "tardanzas": 0,
+                "faltas": 0,
+                "horas_extras": 0.0, # Acumulador float
+                "total_dias": 0
+            }
+            
+        stats = employee_stats[user_id]
+        stats["total_dias"] += 1
+        
+        # Estado
+        estado = str(record.get("estado_asistencia", "")).upper().strip()
+        
+        if estado == "PRESENTE":
+            stats["puntual"] += 1
+        elif estado in ["TARDANZA", "TARDE"]:
+            stats["tardanzas"] += 1
+        elif estado in ["FALTA", "AUSENTE"]:
+            stats["faltas"] += 1
+        else:
+             # Log unknown status for debugging
+             logger.warning(f"Estado de asistencia desconocido: {estado} para usuario {user_id}")
+            
+        # Horas Extras
+        horas_esp = float(record.get("horas_esperadas", 0) or 0)
+        horas_trab = float(record.get("horas_trabajadas", 0) or 0)
+        
+        if horas_trab > horas_esp:
+            overtime = horas_trab - horas_esp
+            stats["horas_extras"] += overtime
 
-    # Convertir a lista para la respuesta JSON
-    results = list(employee_stats.values())
+    # 3. Formatear Resultados y Calcular Totales Globales
+    results = []
+    global_totals = {
+        "puntual": 0,
+        "tardanzas": 0,
+        "faltas": 0,
+        "horas_extras": 0
+    }
+
+    for uid, stats in employee_stats.items():
+        # Convertir horas extras a entero según requerimiento
+        stats["horas_extras"] = int(stats["horas_extras"])
+        
+        # Acumular globales
+        global_totals["puntual"] += stats["puntual"]
+        global_totals["tardanzas"] += stats["tardanzas"]
+        global_totals["faltas"] += stats["faltas"]
+        global_totals["horas_extras"] += stats["horas_extras"]
+        
+        results.append(stats)
     
     return {
         "rango": {
             "fecha_inicio": fecha_inicio,
             "fecha_fin": fecha_fin
         },
+        "totales": global_totals, # Suma total de todos los casos
         "total_empleados": len(results),
         "data": results
     }

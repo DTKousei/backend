@@ -26,7 +26,8 @@ def obtener_sabana_asistencia(
             request.anio, 
             request.mes, 
             user_ids=request.user_ids,
-            area=request.area
+            area=request.area,
+            otros_filtros=request.model_dump(exclude={'anio', 'mes', 'user_ids', 'area'})
         )
         return reporte
     except Exception as e:
