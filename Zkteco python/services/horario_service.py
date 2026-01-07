@@ -6,7 +6,7 @@ Lógica de negocio para gestión de horarios
 from sqlalchemy.orm import Session
 from models.horario import Horario
 from models.turnos import SegmentosHorario, AsignacionHorario, Feriados
-from schemas.horario import HorarioCreate, HorarioUpdate, SegmentoHorarioCreate, AsignacionHorarioCreate, SegmentoHorarioBulkCreate, FeriadoCreate
+from schemas.horario import HorarioCreate, HorarioUpdate, SegmentoHorarioCreate, AsignacionHorarioCreate, SegmentoHorarioBulkCreate, FeriadoCreate, SegmentoHorarioUpdate
 from datetime import datetime
 from typing import List, Optional
 import logging
@@ -78,6 +78,24 @@ class HorarioService:
         db.delete(seg)
         db.commit()
         return True
+
+    @staticmethod
+    def actualizar_segmento(db: Session, segmento_id: int, segmento_update: SegmentoHorarioUpdate) -> Optional[SegmentosHorario]:
+        """
+        Actualiza un segmento de horario existente
+        """
+        db_segmento = db.query(SegmentosHorario).filter(SegmentosHorario.id == segmento_id).first()
+        
+        if not db_segmento:
+            return None
+            
+        update_data = segmento_update.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(db_segmento, field, value)
+            
+        db.commit()
+        db.refresh(db_segmento)
+        return db_segmento
 
     # Asignaciones
     @staticmethod

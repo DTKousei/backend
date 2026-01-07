@@ -45,6 +45,14 @@ class SegmentoHorarioResponse(SegmentoHorarioBase):
     class Config:
         from_attributes = True
 
+class SegmentoHorarioUpdate(BaseModel):
+    """Schema para actualizar un segmento de horario"""
+    dia_semana: Optional[int] = Field(None, ge=0, le=6, description="0=Lunes, 6=Domingo")
+    hora_inicio: Optional[time] = None
+    hora_fin: Optional[time] = None
+    tolerancia_minutos: Optional[int] = Field(None, ge=0)
+    orden_turno: Optional[int] = None
+
 class SegmentoHorarioBulkCreate(BaseModel):
     horario_id: int
     dias_semana: List[int] = Field(..., description="Lista de días 0=Lunes, 6=Domingo")

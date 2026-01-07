@@ -84,7 +84,7 @@ def eliminar_horario(horario_id: int, db: Session = Depends(get_db)):
 
 
 # Endpoints para Segmentos
-from schemas.horario import SegmentoHorarioCreate, SegmentoHorarioResponse, AsignacionHorarioCreate, AsignacionHorarioResponse, SegmentoHorarioBulkCreate, FeriadoCreate, FeriadoResponse, AsignacionHorarioDetailResponse
+from schemas.horario import SegmentoHorarioCreate, SegmentoHorarioResponse, AsignacionHorarioCreate, AsignacionHorarioResponse, SegmentoHorarioBulkCreate, FeriadoCreate, FeriadoResponse, AsignacionHorarioDetailResponse, SegmentoHorarioUpdate
 
 @router.post("/segmentos/", response_model=SegmentoHorarioResponse, status_code=status.HTTP_201_CREATED)
 def crear_segmento(segmento: SegmentoHorarioCreate, db: Session = Depends(get_db)):
@@ -106,6 +106,23 @@ def eliminar_segmento(segmento_id: int, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Segmento {segmento_id} no encontrado"
         )
+
+@router.put("/segmentos/{segmento_id}", response_model=SegmentoHorarioResponse)
+def actualizar_segmento(
+    segmento_id: int,
+    segmento_update: SegmentoHorarioUpdate,
+    db: Session = Depends(get_db)
+):
+    """
+    Actualiza un segmento de horario existente
+    """
+    segmento = HorarioService.actualizar_segmento(db, segmento_id, segmento_update)
+    if not segmento:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Segmento {segmento_id} no encontrado"
+        )
+    return segmento
 
 # Endpoints para Asignaciones
 @router.post("/asignar", response_model=AsignacionHorarioResponse)
