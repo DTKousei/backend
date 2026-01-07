@@ -406,13 +406,35 @@ class AsistenciaService:
         elif not hubo_asistencia:
             estado_final = "FALTA"
         else:
-            if llegada_tarde:
-                estado_final = "TARDE"
-            else:
-                estado_final = "PRESENTE"
+            # Lógica de Estado en Tiempo Real vs Pasado
+            ultimo_fin_seg = max([seg.hora_fin for seg in segmentos]) if segmentos else time(0,0)
+            fecha_ahora = datetime.now()
+            
+            # Limite para marcar salida: Fin de turno + tolerancias (ej 4h)
+            dt_fin_turno = datetime.combine(fecha_proceso, ultimo_fin_seg)
+            dt_limite_salida = dt_fin_turno + timedelta(hours=2)
+            
+            es_dia_pasado_o_terminado = (fecha_proceso < fecha_ahora.date()) or (fecha_proceso == fecha_ahora.date() and fecha_ahora > dt_limite_salida)
             
             if total_horas_trabajadas < (total_horas_esperadas * 0.5):
-                estado_final = "INCOMPLETO"
+                # Caso: Marcó entrada pero no salida (o muy pocas horas)
+                
+                if not es_dia_pasado_o_terminado:
+                    # AUN ESTA EN HORARIO LABORAL (o dentro del limite)
+                    # Mostrar "PRESENTE" o "TARDE" según su ingreso, ignorando que falta salida por ahora
+                    if llegada_tarde:
+                        estado_final = "TARDE"
+                    else:
+                        estado_final = "PRESENTE"
+                else:
+                    # YA ACABO EL DIA y no marcó salida
+                    estado_final = "ABANDONO"
+            else:
+                 # Horas suficientes -> Estado base
+                 if llegada_tarde:
+                    estado_final = "TARDE"
+                 else:
+                    estado_final = "PRESENTE"
 
         reporte.horas_esperadas = total_horas_esperadas
         reporte.horas_trabajadas = round(total_horas_trabajadas, 2)

@@ -27,7 +27,9 @@ class ReporteService:
         "LICENCIA_GO": "L/C",   # Licencia con goce
         "COMISION": "C/S",      # Comisión de servicio
         "PERMISO": "PER",
-        "DESCANSO": "D"         # Descanso médico o semanal
+        "PERMISO": "PER",
+        "DESCANSO": "D",        # Descanso médico o semanal
+        "ABANDONO": "A/B"       # Abandono de trabajo
     }
 
     @staticmethod
