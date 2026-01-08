@@ -13,6 +13,7 @@ import permisoRoutes from './routes/permiso.routes.js';
 
 // Importar middleware de errores
 import { errorHandler } from './middleware/error.middleware.js';
+import { iniciarCronJobs } from './services/cron.service.js';
 
 // Configuración de __dirname para ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -71,6 +72,9 @@ app.listen(PORT, () => {
   console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
   console.log(`📁 Directorio de uploads: ${uploadsDir}`);
   console.log(`📄 Directorio de PDFs generados: ${generatedDir}`);
+  
+  // Iniciar cron jobs
+  iniciarCronJobs();
 });
 
 export default app;

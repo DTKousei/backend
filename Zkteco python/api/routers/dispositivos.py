@@ -72,7 +72,7 @@ def actualizar_dispositivo(
     return dispositivo
 
 
-@router.delete("/{dispositivo_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{dispositivo_id}")
 def eliminar_dispositivo(dispositivo_id: int, db: Session = Depends(get_db)):
     """
     Elimina un dispositivo del sistema
@@ -82,6 +82,7 @@ def eliminar_dispositivo(dispositivo_id: int, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Dispositivo {dispositivo_id} no encontrado"
         )
+    return {"message": "Dispositivo eliminado correctamente"}
 
 
 @router.post("/{dispositivo_id}/test-conexion", response_model=DispositivoTestConexion)

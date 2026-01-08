@@ -12,10 +12,10 @@ class DispositivoBase(BaseModel):
     """Schema base para dispositivo"""
     nombre: str = Field(..., min_length=1, max_length=100, description="Nombre descriptivo del dispositivo")
     ip_address: str = Field(..., description="Dirección IP del dispositivo")
-    puerto: int = Field(default=4370, ge=1, le=65535, description="Puerto TCP del dispositivo")
+    puerto: int = Field(default=4370, ge=0, le=65535, description="Puerto TCP del dispositivo")
     ubicacion: Optional[str] = Field(None, max_length=200, description="Ubicación física")
     password: int = Field(default=0, description="Contraseña del dispositivo")
-    timeout: int = Field(default=5, ge=1, le=60, description="Timeout de conexión en segundos")
+    timeout: int = Field(default=5, ge=0, le=60, description="Timeout de conexión en segundos")
     activo: bool = Field(default=True, description="Si el dispositivo está activo")
 
 

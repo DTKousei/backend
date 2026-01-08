@@ -193,6 +193,10 @@ class DispositivoService:
                 info = zk.obtener_informacion_dispositivo()
                 hora = zk.obtener_hora_dispositivo()
                 info['hora_dispositivo'] = hora
+                # Asegurar campos requeridos por el schema
+                info['puerto'] = db_dispositivo.puerto
+                if 'ip_address' not in info:
+                    info['ip_address'] = db_dispositivo.ip_address
                 return info
             
             finally:

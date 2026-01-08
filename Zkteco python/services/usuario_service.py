@@ -264,11 +264,49 @@ class UsuarioService:
                 
                 db.commit()
                 
+                # ---------------------------------------------------------
+                # NUEVO: Sincronización Inversa (BD -> Dispositivo)
+                # ---------------------------------------------------------
+                
+                # Obtener todos los usuarios de la BD para este dispositivo
+                usuarios_bd = db.query(Usuario).filter(Usuario.dispositivo_id == dispositivo_id).all()
+                
+                # Crear set de user_ids existentes en el dispositivo para búsqueda rápida
+                user_ids_zk = {u.user_id for u in usuarios_zk}
+                
+                usuarios_subidos = 0
+                errores_subida = 0
+                
+                for usuario_bd in usuarios_bd:
+                    # Si el usuario de BD no está en el dispositivo, lo subimos
+                    if usuario_bd.user_id not in user_ids_zk:
+                        try:
+                            logger.info(f"Subiendo usuario faltante al dispositivo: {usuario_bd.user_id}")
+                            if zk.agregar_usuario(
+                                user_id=usuario_bd.user_id,
+                                name=usuario_bd.nombre,
+                                privilege=usuario_bd.privilegio,
+                                password=usuario_bd.password or '',
+                                group_id=usuario_bd.grupo or '',
+                                user_id_num=usuario_bd.uid or 0
+                            ):
+                                usuarios_subidos += 1
+                            else:
+                                errores_subida += 1
+                                logger.error(f"Fallo al subir usuario {usuario_bd.user_id}")
+                        except Exception as e:
+                            errores_subida += 1
+                            logger.error(f"Excepción al subir usuario {usuario_bd.user_id}: {str(e)}")
+
+                db.commit()
+                
                 return {
                     "success": True,
-                    "message": f"Sincronización exitosa",
-                    "usuarios_nuevos": usuarios_nuevos,
-                    "usuarios_actualizados": usuarios_actualizados
+                    "message": f"Sincronización bidireccional exitosa",
+                    "usuarios_nuevos_descargados": usuarios_nuevos,
+                    "usuarios_actualizados_bd": usuarios_actualizados,
+                    "usuarios_subidos_dispositivo": usuarios_subidos,
+                    "errores_subida": errores_subida
                 }
             
             finally:
@@ -279,6 +317,8 @@ class UsuarioService:
             return {
                 "success": False,
                 "message": f"Error: {str(e)}",
-                "usuarios_nuevos": 0,
-                "usuarios_actualizados": 0
+                "usuarios_nuevos_descargados": 0,
+                "usuarios_actualizados_bd": 0,
+                "usuarios_subidos_dispositivo": 0,
+                "errores_subida": 0
             }
