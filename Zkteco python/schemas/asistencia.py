@@ -10,7 +10,8 @@ from datetime import datetime, time
 
 class AsistenciaBase(BaseModel):
     """Schema base para asistencia"""
-    user_id: str = Field(..., description="ID del usuario")
+    user_id: Optional[str] = Field(None, description="ID del usuario (DNI)")
+    uid: int = Field(..., description="UID interno del dispositivo")
     timestamp: datetime = Field(..., description="Fecha y hora de la marcación")
     status: int = Field(default=0, description="Estado del registro")
     punch: int = Field(default=0, description="Tipo de marcación")
@@ -30,7 +31,9 @@ class AsistenciaResponse(AsistenciaBase):
 
 class AsistenciaFilter(BaseModel):
     """Schema para filtrar asistencias"""
-    user_id: Optional[str] = Field(None, description="Filtrar por ID de usuario")
+    uid: Optional[int] = Field(None, description="Filtrar por UID")
+    user_id: Optional[str] = Field(None, description="Filtrar por ID de usuario NO FUNCIONA IGUAL Q ANTES")
+    dispositivo_id: Optional[int] = Field(None, description="Filtrar por dispositivo")
     dispositivo_id: Optional[int] = Field(None, description="Filtrar por dispositivo")
     fecha_inicio: Optional[datetime] = Field(None, description="Fecha de inicio del rango")
     fecha_fin: Optional[datetime] = Field(None, description="Fecha de fin del rango")

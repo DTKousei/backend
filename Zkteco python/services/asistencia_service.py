@@ -25,8 +25,8 @@ class AsistenciaService:
         """Obtiene registros crudos de asistencia con filtros"""
         query = db.query(Asistencia)
         
-        if filtros.user_id:
-            query = query.filter(Asistencia.user_id == filtros.user_id)
+        if filtros.uid:
+            query = query.filter(Asistencia.uid == filtros.uid)
         if filtros.dispositivo_id:
             query = query.filter(Asistencia.dispositivo_id == filtros.dispositivo_id)
         if filtros.fecha_inicio:
@@ -40,8 +40,8 @@ class AsistenciaService:
     def contar_asistencias(db: Session, filtros: AsistenciaFilter) -> int:
         """Cuenta registros totales con filtros"""
         query = db.query(Asistencia)
-        if filtros.user_id:
-            query = query.filter(Asistencia.user_id == filtros.user_id)
+        if filtros.uid:
+            query = query.filter(Asistencia.uid == filtros.uid)
         if filtros.dispositivo_id:
             query = query.filter(Asistencia.dispositivo_id == filtros.dispositivo_id)
         if filtros.fecha_inicio:
@@ -84,20 +84,20 @@ class AsistenciaService:
             
             for log in logs_hoy:
                 total_procesados += 1
-                # Verificar si existe (user_id + timestamp + dispositivo_id)
+                # Verificar si existe (uid + timestamp + dispositivo_id)
                 exists = db.query(Asistencia).filter(
-                    Asistencia.user_id == log.user_id,
+                    Asistencia.uid == log.uid,
                     Asistencia.timestamp == log.timestamp,
                     Asistencia.dispositivo_id == dispositivo_id
                 ).first()
                 
                 if not exists:
-                    # Verificar si el usuario existe en la BD para respetar FK
-                    usuario_existe = db.query(Usuario).filter(Usuario.user_id == log.user_id).first()
+                    # Verificar si el usuario existe en la BD por UID
+                    usuario_existe = db.query(Usuario).filter(Usuario.uid == log.uid).first()
                     
                     if usuario_existe:
                         nuevo_log = Asistencia(
-                            user_id=log.user_id,
+                            uid=log.uid,
                             dispositivo_id=dispositivo_id,
                             timestamp=log.timestamp,
                             status=log.status,
@@ -144,20 +144,27 @@ class AsistenciaService:
             for log in logs:
                 # Verificar si existe (user_id + timestamp + dispositivo_id)
                 exists = db.query(Asistencia).filter(
-                    Asistencia.user_id == log.user_id,
+                    Asistencia.uid == log.uid,
                     Asistencia.timestamp == log.timestamp,
                     Asistencia.dispositivo_id == dispositivo_id
                 ).first()
                 
                 if not exists:
-                    # Verificar si el usuario existe en la BD para respetar FK
-                    usuario_existe = db.query(Usuario).filter(Usuario.user_id == log.user_id).first()
+                    # Verificar si el usuario existe en la BD usando UID
+                    # Si existe un usuario con ese UID, lo enlazamos.
+                    # Si el user_id (DNI) del log no coincide con el de BD, asumimos que el user_id del dispositivo está mal o es irrelevante
+                    usuario_existe = db.query(Usuario).filter(Usuario.uid == log.uid).first()
+                    
+                    # Logica: Si usuario con ese UID existe => Insertar
+                    # Si no existe => Ignorar o Crear (segun reglas, aqui es Ignorar)
                     
                     if usuario_existe:
+                        if usuario_existe.user_id != log.user_id:
+                             logger.warning(f"Conflicto de DNI: UID {log.uid} tiene DNI {log.user_id} en dispositivo pero {usuario_existe.user_id} en BD. Se usará el UID como verdad.")
+
                         nuevo_log = Asistencia(
-                            user_id=log.user_id,
+                            uid=log.uid, # UID entero
                             dispositivo_id=dispositivo_id,
-                            # usuario_db_id removed
                             timestamp=log.timestamp,
                             status=log.status,
                             punch=log.punch,
@@ -167,7 +174,7 @@ class AsistenciaService:
                         db.add(nuevo_log)
                         nuevos += 1
                     else:
-                        logger.warning(f"Log ignorado: Usuario {log.user_id} no existe en BD")
+                        logger.warning(f"Log ignorado: UID {log.uid} no existe en tabla Usuarios")
             
             db.commit()
             return {
@@ -238,8 +245,13 @@ class AsistenciaService:
         inicio_dia = datetime.combine(datos.fecha_hora.date(), time.min)
         fin_dia = datetime.combine(datos.fecha_hora.date(), time.max)
         
+        # Necesitamos el UID del empleado para buscar asistencias
+        empleado = db.query(Usuario).filter(Usuario.user_id == datos.empleado_id).first()
+        if not empleado:
+             raise ValueError("Empleado no encontrado")
+             
         ultimo_registro = db.query(Asistencia).filter(
-            Asistencia.user_id == datos.empleado_id,
+            Asistencia.uid == empleado.uid, # Usar UID
             Asistencia.timestamp >= inicio_dia,
             Asistencia.timestamp <= fin_dia
         ).order_by(Asistencia.timestamp.desc()).first()
@@ -259,7 +271,7 @@ class AsistenciaService:
         
         # 4. Crear registro
         registro = Asistencia(
-            user_id=datos.empleado_id,
+            uid=empleado.uid, # Usar UID recuperado del usuario
             dispositivo_id=999, # ID reservado para manual/web
             timestamp=datos.fecha_hora,
             status=0,
@@ -351,12 +363,13 @@ class AsistenciaService:
             db.commit()
             return reporte
 
-        # Buscar logs del día
+        # Buscar logs del día usando UID
         inicio_dia = datetime.combine(fecha_proceso, time.min)
         fin_dia = datetime.combine(fecha_proceso, time.max)
         
+        # IMPORTANTE: Buscar por UID, no por user_id directamente en la tabla de asistencias
         logs = db.query(Asistencia).filter(
-            Asistencia.user_id == user_id,
+            Asistencia.uid == usuario.uid,
             Asistencia.timestamp >= inicio_dia,
             Asistencia.timestamp <= fin_dia
         ).order_by(Asistencia.timestamp).all()

@@ -17,8 +17,8 @@ class Usuario(Base):
     
     # Campos principales
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    user_id = Column(String(20), nullable=False, unique=True, index=True, comment="ID del usuario en el dispositivo")
-    uid = Column(Integer, comment="UID interno del dispositivo")
+    user_id = Column(String(20), nullable=False, unique=True, index=True, comment="ID del usuario en el dispositivo (DNI)")
+    uid = Column(Integer, nullable=False, unique=True, index=True, comment="UID interno del dispositivo")
     nombre = Column(String(100), nullable=False, comment="Nombre completo del usuario")
     
     # Información de acceso

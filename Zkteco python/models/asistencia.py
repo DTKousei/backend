@@ -17,7 +17,7 @@ class Asistencia(Base):
     
     # Campos principales
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    user_id = Column(String(20), ForeignKey("usuarios.user_id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False, index=True, comment="ID del usuario")
+    uid = Column(Integer, ForeignKey("usuarios.uid", ondelete="CASCADE", onupdate="CASCADE"), nullable=False, index=True, comment="UID del usuario (interno dispositivo)")
     
     # Relaciones
     dispositivo_id = Column(Integer, ForeignKey("dispositivos.id", ondelete="CASCADE"), nullable=False)
@@ -41,19 +41,19 @@ class Asistencia(Base):
     
     # Índices compuestos para búsquedas eficientes
     __table_args__ = (
-        Index('idx_user_timestamp', 'user_id', 'timestamp'),
+        Index('idx_uid_timestamp', 'uid', 'timestamp'),
         Index('idx_dispositivo_timestamp', 'dispositivo_id', 'timestamp'),
         Index('idx_timestamp_dispositivo', 'timestamp', 'dispositivo_id'),
     )
     
     def __repr__(self):
-        return f"<Asistencia(id={self.id}, user_id='{self.user_id}', timestamp='{self.timestamp}')>"
+        return f"<Asistencia(id={self.id}, uid={self.uid}, timestamp='{self.timestamp}')>"
     
     def to_dict(self):
         """Convierte el objeto a diccionario"""
         return {
             "id": self.id,
-            "user_id": self.user_id,
+            "uid": self.uid,
             "dispositivo_id": self.dispositivo_id,
             "timestamp": self.timestamp.isoformat() if self.timestamp else None,
             "status": self.status,
