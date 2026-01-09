@@ -17,7 +17,7 @@ class Asistencia(Base):
     
     # Campos principales
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    user_id = Column(String(20), ForeignKey("usuarios.user_id", ondelete="CASCADE"), nullable=False, index=True, comment="ID del usuario")
+    user_id = Column(String(20), ForeignKey("usuarios.user_id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False, index=True, comment="ID del usuario")
     
     # Relaciones
     dispositivo_id = Column(Integer, ForeignKey("dispositivos.id", ondelete="CASCADE"), nullable=False)

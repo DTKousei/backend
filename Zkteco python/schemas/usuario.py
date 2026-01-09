@@ -36,6 +36,7 @@ class UsuarioCreate(UsuarioBase):
 
 class UsuarioUpdate(BaseModel):
     """Schema para actualizar un usuario (todos los campos opcionales)"""
+    user_id: Optional[str] = Field(None, min_length=1, max_length=20, description="DNI o ID del usuario")
     nombre: Optional[str] = Field(None, min_length=1, max_length=100)
     privilegio: Optional[int] = Field(None, ge=0, le=14)
     password: Optional[str] = Field(None, max_length=20)

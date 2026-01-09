@@ -60,6 +60,69 @@ class AsistenciaService:
         ).order_by(Asistencia.timestamp.desc()).all()
 
     @staticmethod
+    def sincronizar_asistencias_hoy(db: Session, dispositivo_id: int):
+        """Sincroniza SOLO asistencias de HOY desde el dispositivo"""
+        dispositivo = db.query(Dispositivo).filter(Dispositivo.id == dispositivo_id).first()
+        if not dispositivo:
+            return {"success": False, "message": "Dispositivo no encontrado"}
+            
+        if not dispositivo.activo:
+             return {"success": False, "message": "Dispositivo inactivo"}
+
+        conn = ZKTecoConnection(dispositivo.ip_address, dispositivo.puerto, dispositivo.timeout, dispositivo.password)
+        if not conn.conectar():
+             return {"success": False, "message": "No se pudo conectar al dispositivo"}
+        
+        try:
+            logs = conn.obtener_asistencias()
+            nuevos = 0
+            total_procesados = 0
+            hoy = date.today()
+            
+            # Filtrar logs solo de hoy
+            logs_hoy = [log for log in logs if log.timestamp.date() == hoy]
+            
+            for log in logs_hoy:
+                total_procesados += 1
+                # Verificar si existe (user_id + timestamp + dispositivo_id)
+                exists = db.query(Asistencia).filter(
+                    Asistencia.user_id == log.user_id,
+                    Asistencia.timestamp == log.timestamp,
+                    Asistencia.dispositivo_id == dispositivo_id
+                ).first()
+                
+                if not exists:
+                    # Verificar si el usuario existe en la BD para respetar FK
+                    usuario_existe = db.query(Usuario).filter(Usuario.user_id == log.user_id).first()
+                    
+                    if usuario_existe:
+                        nuevo_log = Asistencia(
+                            user_id=log.user_id,
+                            dispositivo_id=dispositivo_id,
+                            timestamp=log.timestamp,
+                            status=log.status,
+                            punch=log.punch,
+                            sincronizado=True,
+                            fecha_sincronizacion=datetime.now()
+                        )
+                        db.add(nuevo_log)
+                        nuevos += 1
+            
+            db.commit()
+            return {
+                "success": True, 
+                "message": f"Sincronización de HOY completada ({hoy})", 
+                "registros_nuevos": nuevos, 
+                "registros_totales_hoy": len(logs_hoy), 
+                "dispositivo_id": dispositivo_id
+            }
+        except Exception as e:
+            db.rollback()
+            return {"success": False, "message": str(e)}
+        finally:
+            conn.desconectar()
+
+    @staticmethod
     def sincronizar_asistencias_desde_dispositivo(db: Session, dispositivo_id: int):
         """Sincroniza asistencias desde el dispositivo físico"""
         dispositivo = db.query(Dispositivo).filter(Dispositivo.id == dispositivo_id).first()

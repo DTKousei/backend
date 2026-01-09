@@ -91,9 +91,23 @@ def obtener_asistencias_tiempo_real(
 @router.post("/sincronizar/{dispositivo_id}", response_model=AsistenciaSincronizacion)
 def sincronizar_asistencias(dispositivo_id: int, db: Session = Depends(get_db)):
     """
-    Sincroniza asistencias desde el dispositivo ZKTeco a la base de datos
+    Sincroniza asistencias desde el dispositivo ZKTeco a la base de datos (TODO EL HISTORIAL)
     """
     resultado = AsistenciaService.sincronizar_asistencias_desde_dispositivo(db, dispositivo_id)
+    if not resultado["success"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=resultado["message"]
+        )
+    return resultado
+
+
+@router.post("/sincronizar-hoy/{dispositivo_id}", response_model=AsistenciaSincronizacion)
+def sincronizar_asistencias_hoy(dispositivo_id: int, db: Session = Depends(get_db)):
+    """
+    Sincroniza asistencias desde el dispositivo ZKTeco a la base de datos (SOLO DÍA ACTUAL)
+    """
+    resultado = AsistenciaService.sincronizar_asistencias_hoy(db, dispositivo_id)
     if not resultado["success"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

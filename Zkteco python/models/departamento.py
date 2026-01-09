@@ -17,7 +17,7 @@ class Departamento(Base):
     descripcion = Column(String(255), nullable=True, comment="Descripción del área")
     
     # Jefe del departamento (Referencia al DNI/user_id del usuario)
-    jefe_id = Column(String(20), ForeignKey("usuarios.user_id", ondelete="SET NULL"), nullable=True, comment="DNI del jefe del área")
+    jefe_id = Column(String(20), ForeignKey("usuarios.user_id", ondelete="SET NULL", onupdate="CASCADE"), nullable=True, comment="DNI del jefe del área")
     
     # Timestamps
     fecha_creacion = Column(DateTime, default=datetime.now)

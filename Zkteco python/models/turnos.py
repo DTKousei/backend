@@ -37,7 +37,7 @@ class AsignacionHorario(Base):
     __tablename__ = "asignacion_horario"
     
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    user_id = Column(String(20), ForeignKey("usuarios.user_id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(String(20), ForeignKey("usuarios.user_id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
     horario_id = Column(Integer, ForeignKey("horarios.id", ondelete="CASCADE"), nullable=False)
     
     fecha_inicio = Column(Date, nullable=False, comment="Fecha inicio validez")

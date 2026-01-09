@@ -16,7 +16,7 @@ class AsistenciaDiaria(Base):
     
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     fecha = Column(Date, nullable=False, index=True)
-    user_id = Column(String(20), ForeignKey("usuarios.user_id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(String(20), ForeignKey("usuarios.user_id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False, index=True)
     
     # Snapshot del horario usado para cálculo
     horario_id_snapshot = Column(Integer, ForeignKey("horarios.id", ondelete="SET NULL"), nullable=True)
