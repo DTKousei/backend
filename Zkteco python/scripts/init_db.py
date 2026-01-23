@@ -10,7 +10,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from models.database import init_db, drop_db, engine
-from models import Dispositivo, Usuario, Asistencia, Horario, Departamento
+from models import Dispositivo, Usuario, Asistencia, Horario, Departamento, ReportesGenerados, TipoReporte
 from config import settings
 import logging
 

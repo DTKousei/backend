@@ -208,7 +208,11 @@ class UsuarioService:
     def sincronizar_usuarios_desde_dispositivo(db: Session, dispositivo_id: int) -> dict:
         """
         Sincroniza todos los usuarios desde el dispositivo ZKTeco a la BD (y viceversa)
-        Usando estrategia de vinculación por UID para suportar IDs correlativos
+        
+        NUEVA LÓGICA (STRICT MAPPING):
+        - Fuente de verdad: Dispositivo (ID Numérico -> UID, Nombre -> Nombre)
+        - Matching: EXCLUSIVAMENTE por UID (campo uid en BD).
+        - user_id (DNI): SE IGNORA. Si se crea usuario nuevo, user_id=None.
         """
         dispositivo = db.query(Dispositivo).filter(Dispositivo.id == dispositivo_id).first()
         
@@ -245,82 +249,63 @@ class UsuarioService:
                 usuarios_nuevos = 0
                 usuarios_actualizados = 0
                 
-                # Crear diccionario de usuarios ZK para búsqueda rápida por user_id (string ID visual)
-                # ZK user_id (ej "1") -> Objeto Usuario ZK
-                mp_usuarios_zk = {str(u.user_id): u for u in usuarios_zk}
+                # Mapa actual de usuarios en dispositivo: UID -> Objeto ZK
+                mp_usuarios_zk = {}
                 
                 # ---------------------------------------------------------
                 # 1. Descarga (Dispositivo -> BD)
                 # ---------------------------------------------------------
                 for usuario_zk in usuarios_zk:
-                    zk_id_str = str(usuario_zk.user_id)
-                    
-                    # Intentar obtener valor numérico para el UID
                     try:
-                        uid_num = int(zk_id_str)
-                    except ValueError:
-                        uid_num = 0 # Fallback si es alfanumérico complejo
-
-                    # Estrategia de Búsqueda de Usuario en BD:
-                    # 1. Buscar coincidencia por UID (Para casos donde el ID ZK es correlativo 1, 2, 3...)
-                    db_usuario = None
-                    if uid_num > 0:
-                        db_usuario = db.query(Usuario).filter(
-                            Usuario.uid == uid_num,
-                            Usuario.dispositivo_id == dispositivo_id
-                        ).first()
-                    
-                    # 2. Si no se encuentra por UID, intentar por user_id (Legacy/Coincidencia directa DNI)
-                    if not db_usuario:
-                        db_usuario = db.query(Usuario).filter(
-                            Usuario.user_id == zk_id_str,
-                            Usuario.dispositivo_id == dispositivo_id
-                        ).first()
-                    
-                    if db_usuario:
-                        # --- ACTUALIZAR USUARIO EXISTENTE ---
-                        changed = False
-                        if db_usuario.nombre != usuario_zk.name:
-                            db_usuario.nombre = usuario_zk.name
-                            changed = True
-                        if db_usuario.privilegio != usuario_zk.privilege:
-                            db_usuario.privilegio = usuario_zk.privilege
-                            changed = True
-                        # Asegurar que el UID esté sincronizado
-                        if db_usuario.uid != uid_num and uid_num > 0:
-                            db_usuario.uid = uid_num
-                            changed = True
-                            
-                        # Actualizar otros campos técnicos
-                        db_usuario.password = usuario_zk.password
-                        db_usuario.grupo = usuario_zk.group_id
+                        # IMPLEMENTACION "DESDE CERO": 
+                        # El campo user_id del dispositivo (ej. "13") es el VERDADERO identificador que vincula con los logs.
+                        # Por lo tanto, mapeamos Device.user_id -> DB.uid
                         
-                        if changed:
-                            db_usuario.fecha_actualizacion = datetime.now()
+                        try:
+                            # Intentamos convertir el user_id (string) a entero para usarlo como UID
+                            final_uid = int(usuario_zk.user_id)
+                        except ValueError:
+                            # Si tiene letras, fallback a u.uid (interno) o generar error
+                            logger.warning(f"Usuario {usuario_zk.name} tiene user_id no numerico '{usuario_zk.user_id}'. Saltando o usando fallback.")
+                            continue # Saltamos por seguridad para garantizar integridad de asistencias
+
+                        # Buscar en BD por este UID transformado
+                        db_usuario = db.query(Usuario).filter(
+                            Usuario.uid == final_uid
+                        ).first()
+                        
+                        # Preparar datos base
+                        # RECORDAR: DB.user_id es "desvinculado" pero debe ser UNIQUE y NON-NULL.
+                        # Usamos el mismo valor en string para cumplir constraints sin darle uso lógico.
+                        datos_usuario = {
+                            "uid": final_uid, 
+                            "nombre": usuario_zk.name,
+                            "privilegio": usuario_zk.privilege,
+                            "password": usuario_zk.password,
+                            "grupo": usuario_zk.group_id,
+                            "user_id": str(final_uid), # Relleno para cumplir constraint UNIQUE
+                            "dispositivo_id": dispositivo_id,
+                            # Preservar fecha creación si existe, sino now()
+                        }
+
+                        if db_usuario:
+                            # Actualizar
+                            update_stmt = (
+                                update(Usuario)
+                                .where(Usuario.uid == final_uid)
+                                .values(**datos_usuario)
+                            )
+                            db.execute(update_stmt)
                             usuarios_actualizados += 1
-                    else:
-                        # --- CREAR NUEVO USUARIO ---
-                        # Verificar que el user_id (string) no exista ya en la BD (unique constraint)
-                        # Si existe (pero no tenía UID coincidente), tenemos un conflicto de ID.
-                        # Asumimos que si no lo encontramos arriba, es seguro usar este ID.
-                        
-                        check_unique = db.query(Usuario).filter(Usuario.user_id == zk_id_str).first()
-                        if check_unique:
-                            # Caso raro: Existe user_id="1" pero no vinculado a este dispositivo o UID incorrecto
-                            logger.warning(f"Conflicto de sincronización: user_id {zk_id_str} ya existe pero no coincidió por UID")
-                            continue
-
-                        db_usuario = Usuario(
-                            user_id=zk_id_str,
-                            uid=uid_num, # Guardamos el ID del biométrico en el campo UID
-                            nombre=usuario_zk.name,
-                            privilegio=usuario_zk.privilege,
-                            password=usuario_zk.password,
-                            grupo=usuario_zk.group_id,
-                            dispositivo_id=dispositivo_id
-                        )
-                        db.add(db_usuario)
-                        usuarios_nuevos += 1
+                        else:
+                            # Crear Nuevo
+                            nuevo_usuario = Usuario(**datos_usuario)
+                            db.add(nuevo_usuario)
+                            usuarios_nuevos += 1
+                            
+                    except Exception as inner_e:
+                        logger.error(f"Error procesando usuario {usuario_zk.uid}: {inner_e}")
+                        continue
                 
                 db.commit()
                 
@@ -328,48 +313,43 @@ class UsuarioService:
                 # 2. Subida / Sincronización Inversa (BD -> Dispositivo)
                 # ---------------------------------------------------------
                 
-                # Obtener todos los usuarios de la BD para este dispositivo
-                usuarios_bd = db.query(Usuario).filter(Usuario.dispositivo_id == dispositivo_id).all()
+                # Obtener todos los usuarios de la BD que tienen UID asignado
+                # (Los que no tienen UID no se pueden subir fiablemnete sin riesgo de colisión, 
+                #  o necesitarían asignación de UID previo)
+                usuarios_bd = db.query(Usuario).filter(
+                    Usuario.dispositivo_id == dispositivo_id,
+                    Usuario.uid != None
+                ).all()
                 
                 usuarios_subidos = 0
                 errores_subida = 0
                 
                 for usuario_bd in usuarios_bd:
-                    # Determinar qué ID esperamos que tenga en el ZK
-                    # Prioridad: Su UID (si tiene), sino su user_id
-                    target_zk_id = str(usuario_bd.uid) if usuario_bd.uid and usuario_bd.uid > 0 else usuario_bd.user_id
-                    
-                    # Verificar si este ID ya existe en los datos que bajamos del ZK
-                    if target_zk_id not in mp_usuarios_zk:
+                    # Verificar si este UID ya existe en los datos que bajamos del ZK
+                    if usuario_bd.uid not in mp_usuarios_zk:
                         try:
-                            logger.info(f"Subiendo usuario faltante al dispositivo: {usuario_bd.nombre} (ID: {target_zk_id})")
+                            # Subir usuario al dispositivo
+                            logger.info(f"Subiendo usuario faltante al dispositivo: {usuario_bd.nombre} (UID: {usuario_bd.uid})")
                             
-                            # Preparar datos para ZKTeco
-                            uid_to_send = usuario_bd.uid if (usuario_bd.uid and usuario_bd.uid > 0) else 0
-                            
-                            # Si no tiene UID, intentamos usar el user_id como UID si es numérico (para user_id_num)
-                            if uid_to_send == 0 and usuario_bd.user_id.isdigit():
-                                uid_to_send = int(usuario_bd.user_id)
-                                
                             if zk.agregar_usuario(
-                                user_id=target_zk_id, # El ID visible en pantalla
+                                user_id=str(usuario_bd.uid), # ID en String
                                 name=usuario_bd.nombre,
                                 privilege=usuario_bd.privilegio,
                                 password=usuario_bd.password or '',
                                 group_id=usuario_bd.grupo or '',
-                                user_id_num=uid_to_send # ID interno numérico
+                                user_id_num=usuario_bd.uid # ID Numérico
                             ):
                                 usuarios_subidos += 1
                             else:
                                 errores_subida += 1
-                                logger.error(f"Fallo al subir usuario {target_zk_id}")
+                                logger.error(f"Fallo al subir usuario UID {usuario_bd.uid}")
                         except Exception as e:
                             errores_subida += 1
-                            logger.error(f"Excepción al subir usuario {target_zk_id}: {str(e)}")
+                            logger.error(f"Excepción al subir usuario UID {usuario_bd.uid}: {str(e)}")
 
                 return {
                     "success": True,
-                    "message": f"Sincronización bidireccional (Modo UID) exitosa",
+                    "message": f"Sincronización bidireccional (Modo estricto UID) exitosa",
                     "usuarios_nuevos_descargados": usuarios_nuevos,
                     "usuarios_actualizados_bd": usuarios_actualizados,
                     "usuarios_subidos_dispositivo": usuarios_subidos,
@@ -380,6 +360,7 @@ class UsuarioService:
                 zk.desconectar()
         
         except Exception as e:
+            db.rollback() 
             logger.error(f"Error al sincronizar usuarios: {str(e)}")
             return {
                 "success": False,

@@ -45,6 +45,9 @@ class Settings(BaseSettings):
     AUTO_SYNC_ENABLED: bool = True
     AUTO_SYNC_INTERVAL: int = 300  # 5 minutos
     
+    # Configuración de Incidencias
+    INCIDENCIAS_API_URL: str = "http://localhost:3003/api/incidencias"
+    
     # Configuración de Logs
     LOG_LEVEL: str = "INFO"
     LOG_FILE: str = "logs/api.log"

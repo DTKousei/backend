@@ -283,6 +283,36 @@ class UserController {
             res.status(400).json({ success: false, message: error.message });
         }
     }
+
+    // ============================================
+    // MÉTODO: getLockStatus
+    // ============================================
+    // Se espera parámetro :usuario (DNI) en lugar de :id
+    async getLockStatus(req, res) {
+        try {
+            const status = await userService.getLockStatusByUsername(req.params.usuario);
+            res.status(200).json({ success: true, data: status });
+        } catch (error) {
+            res.status(404).json({ success: false, message: error.message });
+        }
+    }
+
+    // ============================================
+    // MÉTODO: unlock
+    // ============================================
+    // Se espera parámetro :usuario (DNI) en lugar de :id
+    async unlock(req, res) {
+        try {
+            const user = await userService.unlockUserByUsername(req.params.usuario);
+            res.status(200).json({ 
+                success: true, 
+                message: 'Usuario desbloqueado exitosamente',
+                data: user 
+            });
+        } catch (error) {
+            res.status(400).json({ success: false, message: error.message });
+        }
+    }
 }
 
 module.exports = new UserController();

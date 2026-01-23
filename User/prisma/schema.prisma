@@ -48,6 +48,8 @@ model usuarios {
   esta_activo        Boolean            @default(true)
   creado_en          DateTime           @default(now()) @db.Timestamp(6)
   actualizado_en     DateTime           @default(now()) @updatedAt @db.Timestamp(6)
+  intentos_fallidos  Int                @default(0)
+  bloqueado_hasta    DateTime?          @db.Timestamp(6)
   sesiones_usuario   sesiones_usuario[]
   usuario_permisos   usuario_permisos[]
   rol                roles              @relation(fields: [rol_id], references: [id])
@@ -65,7 +67,7 @@ model usuario_permisos {
 model sesiones_usuario {
   id         String   @id @default(uuid()) @db.VarChar(36)
   usuario_id String   @db.VarChar(36)
-  token      String   @db.VarChar(500) 
+  token      String   @db.VarChar(500)
   expira_en  DateTime @db.Timestamp(6)
   creado_en  DateTime @default(now()) @db.Timestamp(6)
   usuario    usuarios @relation(fields: [usuario_id], references: [id], onDelete: Cascade)

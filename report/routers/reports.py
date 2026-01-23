@@ -120,6 +120,61 @@ def export_pdf(request: ReportRequest, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+class SaldosRequest(BaseModel):
+    anio: int
+    empleado_id: Optional[str] = None
+
+from services.data_fetcher import fetch_saldos_incidencias
+from services.pdf_saldos_gen import generate_saldos_pdf_report
+
+@router.post("/export/saldos-pdf")
+def export_saldos_pdf(request: SaldosRequest, db: Session = Depends(get_db)):
+    """
+    Endpoint para exportar el reporte de saldos de incidencias en PDF.
+    """
+    try:
+        # 1. Obtener Datos
+        data = fetch_saldos_incidencias(anio=request.anio, empleado_id=request.empleado_id)
+        
+        if not data:
+             raise HTTPException(status_code=404, detail="No se encontraron datos de saldos para el año especificado.")
+
+        # 2. Generar PDF
+        file_path = generate_saldos_pdf_report(data, request.anio)
+        file_name = os.path.basename(file_path)
+        
+        # 3. Registrar en BD
+        # Reusamos lógica similar a _generate_and_save pero manual pq los argumentos varían
+        format_obj = get_or_create_format(db, "PDF", ".pdf", "application/pdf")
+        tipo_obj = get_or_create_type(db, "Saldos Incidencias")
+        
+        usuario_id = 1 # TODO: Token
+        
+        reporte = ReporteGenerado(
+            usuario_id=usuario_id,
+            tipo_reporte_id=tipo_obj.id,
+            formato_id=format_obj.id,
+            nombre_archivo=file_name,
+            ruta_archivo=file_path,
+            area=None,
+            parametros_usados={"anio": request.anio, "empleado_id": request.empleado_id}
+        )
+        db.add(reporte)
+        db.commit()
+        db.refresh(reporte)
+        
+        return FileResponse(
+            path=reporte.ruta_archivo, 
+            filename=reporte.nombre_archivo, 
+            media_type=reporte.formato.mime_type
+        )
+
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/generated/{report_id}")
 def view_generated_report(
     report_id: int, 

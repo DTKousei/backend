@@ -134,3 +134,62 @@ def fetch_sabana_data(mes: str, anio: str, user_ids: list[str] = None, area: str
     except requests.exceptions.RequestException as e:
         print(f"Error obtaining data: {e}")
         raise
+
+def fetch_saldos_incidencias(anio: int, empleado_id: str = None):
+    """
+    Fetches incidence balances (saldos) and enriches with employee names.
+    Calls:
+      1. Main API (Users) -> Map user_id to name
+      2. Incidences API (Saldos) -> Get balances
+    """
+    try:
+        # 1. Fetch Users
+        # API_BASE_URL is http://localhost:8000/api
+        resp_users = requests.get(f"{API_BASE_URL}/usuarios?limit=2000") # High limit to get all
+        resp_users.raise_for_status()
+        users_list = resp_users.json()
+        
+        # Map user_id -> User Info
+        users_map = {}
+        for u in users_list:
+            # Check user_id field. The API returns user_id as string (DNI usually).
+            uid = u.get("user_id")
+            if uid:
+                users_map[uid] = u
+
+        # 2. Fetch Saldos
+        # INCIDENCIAS_API_URL is http://localhost:3003/api/incidencias
+        url = f"{INCIDENCIAS_API_URL}/saldos"
+        params = {"anio": anio}
+        if empleado_id:
+            params["empleado_id"] = empleado_id
+            
+        resp_saldos = requests.get(url, params=params)
+        resp_saldos.raise_for_status()
+        
+        # Structure: {"anio": 2026, "data": [...]}
+        payload = resp_saldos.json()
+        saldos_data = payload.get("data", [])
+        
+        # 3. Enrich & Format
+        enriched_results = []
+        for item in saldos_data:
+            emp_id = item.get("empleado_id")
+            if not emp_id:
+                continue
+                
+            user_info = users_map.get(emp_id, {})
+            nombre = user_info.get("nombre", "SIN NOMBRE")
+            
+            # Add fields for report
+            item["nombre_empleado"] = nombre
+            item["dni"] = emp_id
+            enriched_results.append(item)
+            
+        return enriched_results
+
+    except Exception as e:
+        print(f"Error fetching saldos: {e}")
+        # Return empty list or raise depending on preference. 
+        # Raising allows controller to handle 500.
+        raise

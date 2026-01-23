@@ -96,7 +96,38 @@ Genera una versión imprimible en `.pdf` del reporte.
 
 ---
 
-### 3. Gestión de Reportes Generados
+### 3. Exportar Reporte de Saldos en PDF
+
+Genera una versión imprimible en `.pdf` del reporte de saldos de incidencias (vacaciones, permisos, etc.) para un empleado específico, o para todos si no se especifica.
+
+- **URL**: `/api/reports/export/saldos-pdf`
+- **Método**: `POST`
+- **Content-Type**: `application/json`
+
+#### Body de Solicitud (JSON)
+
+| Campo         | Tipo   | Requerido | Descripción                                                                 |
+| ------------- | ------ | --------- | --------------------------------------------------------------------------- |
+| `anio`        | int    | Sí        | Año del reporte (ej. 2026).                                                 |
+| `empleado_id` | string | No        | DNI del empleado. Si se omite, genera reporte de todos los que tengan data. |
+
+#### Ejemplo de Solicitud (Input)
+
+```json
+{
+  "anio": 2026,
+  "empleado_id": "12345678"
+}
+```
+
+#### Respuesta (Output)
+
+- **Código**: `200 OK`
+- **Contenido**: Archivo binario `.pdf`.
+
+---
+
+### 4. Gestión de Reportes Generados
 
 Endpoints para listar, descargar y eliminar el historial de reportes.
 
@@ -145,7 +176,7 @@ Elimina el reporte físicamente y de la base de datos.
 
 ---
 
-### 4. Gestión de Tipos de Reporte (CRUD)
+### 5. Gestión de Tipos de Reporte (CRUD)
 
 Endpoints para administrar los tipos de reporte disponibles en el sistema.
 
@@ -202,7 +233,7 @@ Endpoints para administrar los tipos de reporte disponibles en el sistema.
 
 ---
 
-### 5. Estadísticas de Asistencia (Rango de Fechas)
+### 6. Estadísticas de Asistencia (Rango de Fechas)
 
 Obtiene un resumen estadístico de asistencia (puntualidad, tardanzas, faltas, horas extras) para todos los empleados en un rango de fechas específico.
 

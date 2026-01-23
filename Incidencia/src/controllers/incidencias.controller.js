@@ -17,6 +17,84 @@ const createIncidencia = async (req, res, next) => {
       });
     }
 
+    // --- Validación de Límites (Días y Solicitudes) ---
+    const tipoIncidencia = await prisma.tipoIncidencia.findUnique({
+      where: { id: tipo_incidencia_id },
+    });
+
+    if (!tipoIncidencia) {
+      if (req.file) deleteFile(getFileUrl(req.file.filename));
+      return res.status(404).json({ error: 'No encontrado', message: 'Tipo de incidencia no existe' });
+    }
+
+    // Solo validamos si hay límites configurados
+    if (tipoIncidencia.max_dias_anual || tipoIncidencia.max_solicitudes_anual) {
+      const fechaSolicitud = new Date(fecha_inicio);
+      const startYear = fechaSolicitud.getFullYear();
+      const startOfYear = new Date(startYear, 0, 1); // 1 de Enero
+      const endOfYear = new Date(startYear, 11, 31, 23, 59, 59); // 31 de Diciembre
+
+      // Buscar incidencias previas del mismo tipo para este empleado en el año actual (excluyendo rechazadas)
+      const incidenciasPrevias = await prisma.incidencia.findMany({
+        where: {
+          empleado_id,
+          tipo_incidencia_id,
+          motivo_rechazo: null, // Contamos pendientes y aprobadas
+          fecha_inicio: {
+            gte: startOfYear,
+            lte: endOfYear
+          }
+        }
+      });
+
+      // Validar límite de solicitudes (frecuencia)
+      if (tipoIncidencia.max_solicitudes_anual && incidenciasPrevias.length >= tipoIncidencia.max_solicitudes_anual) {
+        if (req.file) deleteFile(getFileUrl(req.file.filename));
+        return res.status(400).json({
+          error: 'Límite excedido',
+          message: `Ha alcanzado el límite de ${tipoIncidencia.max_solicitudes_anual} solicitud(es) por año para este tipo de incidencia.`
+        });
+      }
+
+      // Validar límite de días acumulados
+      if (tipoIncidencia.max_dias_anual) {
+        const countDays = (start, end, calendarDays) => {
+          let count = 0;
+          let current = new Date(start);
+          const endDate = new Date(end);
+          // Normalizar horas para comparar solo fechas
+          current.setHours(0,0,0,0);
+          endDate.setHours(0,0,0,0);
+
+          while (current <= endDate) {
+            const day = current.getDay();
+            // calendarDays=true cuenta todo. calendarDays=false excluye Domingo(0) y Sábado(6)
+            if (calendarDays || (day !== 0 && day !== 6)) {
+              count++;
+            }
+            current.setDate(current.getDate() + 1);
+          }
+          return count;
+        };
+
+        let diasConsumidos = 0;
+        for (const inc of incidenciasPrevias) {
+          diasConsumidos += countDays(inc.fecha_inicio, inc.fecha_fin, tipoIncidencia.toma_dias_calendario);
+        }
+
+        const diasSolicitados = countDays(fecha_inicio, fecha_fin, tipoIncidencia.toma_dias_calendario);
+
+        if (diasConsumidos + diasSolicitados > tipoIncidencia.max_dias_anual) {
+          if (req.file) deleteFile(getFileUrl(req.file.filename));
+          return res.status(400).json({
+            error: 'Límite excedido',
+            message: `Esta solicitud de ${diasSolicitados} días excede su saldo. Ha consumido ${diasConsumidos} de ${tipoIncidencia.max_dias_anual} días permitidos este año.`
+          });
+        }
+      }
+    }
+    // --- Fin Validación de Límites ---
+
     // Crear la incidencia
     const incidencia = await prisma.incidencia.create({
       data: {
@@ -388,6 +466,152 @@ const getIncidenciaDocumento = async (req, res, next) => {
   }
 };
 
+/**
+ * Obtener saldos y consumos de incidencias
+ */
+const getSaldosIncidencias = async (req, res, next) => {
+  try {
+    const { empleado_id, anio } = req.query;
+    
+    // Validar año o usar el actual
+    const year = anio && !isNaN(parseInt(anio)) ? parseInt(anio) : new Date().getFullYear();
+    const startOfYear = new Date(year, 0, 1);
+    const endOfYear = new Date(year, 11, 31, 23, 59, 59);
+
+    // 1. Obtener tipos de incidencia activos y sus límites
+    const tiposIncidencia = await prisma.tipoIncidencia.findMany({
+      where: { esta_activo: true }
+    });
+
+    // 2. Construir filtro de incidencias
+    const whereIncidencias = {
+      motivo_rechazo: null, // Solo aprobadas o pendientes
+      fecha_inicio: {
+        gte: startOfYear,
+        lte: endOfYear
+      }
+    };
+    
+    // Limpiar empleado_id de espacios
+    if (empleado_id) {
+        whereIncidencias.empleado_id = empleado_id.trim();
+    }
+
+    // 3. Obtener incidencias del periodo
+    const incidencias = await prisma.incidencia.findMany({
+      where: whereIncidencias,
+      orderBy: { fecha_inicio: 'asc' },
+      include: { tipo_incidencia: true } // Para tener referencia si fuera necesario
+    });
+
+    // 4. Agrupar por Empleado -> Tipo
+    const reporte = {};
+
+    // Helper para contar días
+    const countDays = (start, end, calendarDays) => {
+      let count = 0;
+      let current = new Date(start);
+      const endDate = new Date(end);
+      current.setHours(0,0,0,0);
+      endDate.setHours(0,0,0,0);
+      while (current <= endDate) {
+        const day = current.getDay();
+        if (calendarDays || (day !== 0 && day !== 6)) count++;
+        current.setDate(current.getDate() + 1);
+      }
+      return count;
+    };
+
+    // Inicializar estructura para empleados encontrados en incidencias (o solo el solicitado)
+    // Si se peridó un empleado específico pero no tiene incidencias, igual deberíamos mostrar sus saldos en 0?
+    // Para simplificar, iteramos sobre las incidencias encontradas. 
+    // Si se requiere ver empleados sin movimientos, se necesitaría consultar la tabla empleados.
+    // Asumiremos que mostramos solo quienes tener actividad O si es un empleado_id especifico.
+
+    const empleadosSet = new Set(incidencias.map(i => i.empleado_id));
+    if (empleado_id) empleadosSet.add(empleado_id);
+
+    for (const empId of empleadosSet) {
+      reporte[empId] = tiposIncidencia.map(tipo => ({
+        tipo_id: tipo.id,
+        tipo_nombre: tipo.nombre,
+        tipo_codigo: tipo.codigo,
+        limites: {
+          dias: tipo.max_dias_anual,
+          solicitudes: tipo.max_solicitudes_anual
+        },
+        consumido: {
+          dias: 0,
+          solicitudes: 0
+        },
+        restante: {
+          dias: tipo.max_dias_anual, // Si es null, sigue siendo null (infinito)
+          solicitudes: tipo.max_solicitudes_anual
+        },
+        detalle: []
+      }));
+    }
+
+    // Procesar incidencias
+    for (const inc of incidencias) {
+      if (!reporte[inc.empleado_id]) continue; // Por seguridad
+
+      // Buscar el tipo en el reporte del empleado
+      const tipoReporte = reporte[inc.empleado_id].find(t => t.tipo_id === inc.tipo_incidencia_id);
+      
+      if (tipoReporte) {
+        // Encontrar configuración real del tipo para saber si cuenta fines de semana
+        const tipoConfig = tiposIncidencia.find(t => t.id === inc.tipo_incidencia_id);
+        const diasCalculados = countDays(inc.fecha_inicio, inc.fecha_fin, tipoConfig.toma_dias_calendario);
+
+        // Actualizar consumos
+        tipoReporte.consumido.dias += diasCalculados;
+        tipoReporte.consumido.solicitudes += 1;
+
+        // Agregar detalle
+        tipoReporte.detalle.push({
+          id: inc.id,
+          fecha_inicio: inc.fecha_inicio.toISOString().split('T')[0],
+          fecha_fin: inc.fecha_fin.toISOString().split('T')[0],
+          dias: diasCalculados,
+          estado_id: inc.estado_id
+        });
+      }
+    }
+
+    // Calcular restantes finales
+    Object.values(reporte).forEach(listaTipos => {
+      listaTipos.forEach(item => {
+        if (item.limites.dias !== null) {
+          item.restante.dias = Math.max(0, item.limites.dias - item.consumido.dias);
+        } else {
+            item.restante.dias = null; // Infinito
+        }
+
+        if (item.limites.solicitudes !== null) {
+          item.restante.solicitudes = Math.max(0, item.limites.solicitudes - item.consumido.solicitudes);
+        } else {
+            item.restante.solicitudes = null; // Infinito
+        }
+      });
+    });
+
+    // Formatear respuesta array
+    const dataResponse = Object.keys(reporte).map(empId => ({
+      empleado_id: empId,
+      saldos: reporte[empId]
+    }));
+
+    res.json({
+      anio: year,
+      data: dataResponse
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createIncidencia,
   getAllIncidencias,
@@ -398,4 +622,5 @@ module.exports = {
   rechazarIncidencia,
   getReporteSabana,
   getIncidenciaDocumento,
+  getSaldosIncidencias,
 };

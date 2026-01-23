@@ -10,7 +10,8 @@ import {
   cargarPDFFirmado,
   verPDF,
   rechazarPermiso,
-  cambiarEstadoPermiso
+  cambiarEstadoPermiso,
+  registrarRetorno
 } from '../controllers/permiso.controller.js';
 import {
   firmarPermisoDigital,
@@ -78,6 +79,12 @@ router.patch('/:id/rechazar', validateUUID, rechazarPermiso);
  * @body    estado_id o codigo_estado
  */
 router.patch('/:id/estado', validateUUID, cambiarEstadoPermiso);
+
+/**
+ * @route   PATCH /api/permisos/:id/retorno
+ * @desc    Registrar hora de retorno (actualiza fecha_hora_fin actual y regenera PDF)
+ */
+router.patch('/:id/retorno', validateUUID, registrarRetorno);
 
 /**
  * @route   PATCH /api/permisos/:id/firmar

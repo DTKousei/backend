@@ -3,8 +3,8 @@ Schemas de Pydantic para Asistencias
 Validación de datos de entrada y salida de la API
 """
 
-from pydantic import BaseModel, Field
-from typing import Optional
+from pydantic import BaseModel, Field, model_validator
+from typing import Optional, List
 from datetime import datetime, time
 
 
@@ -34,7 +34,6 @@ class AsistenciaFilter(BaseModel):
     uid: Optional[int] = Field(None, description="Filtrar por UID")
     user_id: Optional[str] = Field(None, description="Filtrar por ID de usuario NO FUNCIONA IGUAL Q ANTES")
     dispositivo_id: Optional[int] = Field(None, description="Filtrar por dispositivo")
-    dispositivo_id: Optional[int] = Field(None, description="Filtrar por dispositivo")
     fecha_inicio: Optional[datetime] = Field(None, description="Fecha de inicio del rango")
     fecha_fin: Optional[datetime] = Field(None, description="Fecha de fin del rango")
     limit: int = Field(default=100, ge=1, le=10000, description="Límite de registros")
@@ -63,9 +62,29 @@ class AsistenciaDiariaResponse(BaseModel):
     entrada_real: Optional[time]
     salida_real: Optional[time]
     
+    # Campos formateados (HH:MM)
+    horas_esperadas_formato: Optional[str] = None
+    horas_trabajadas_formato: Optional[str] = None
+
     class Config:
         from_attributes = True
 
+
+class ResumenAsistencia(BaseModel):
+    """Schema para resumen de totales"""
+    total_horas_trabajadas: float
+    total_horas_trabajadas_formato: str
+    total_horas_extras: float
+    total_horas_extras_formato: str
+    dias_trabajados: int
+    dias_falta: int
+    dias_tarde: int
+
+
+class ReporteUsuarioConResumen(BaseModel):
+    """Schema para respuesta completa del reporte de usuario"""
+    resumen: ResumenAsistencia
+    detalle: List[AsistenciaDiariaResponse]
 
 
 class TipoAsistencia(str):

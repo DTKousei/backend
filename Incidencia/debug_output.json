@@ -1,0 +1,16 @@
+[
+  {
+    "id": "53bffc0d-a699-457b-b68e-b0045848bffc",
+    "empleado_id": "40126700",
+    "tipo_incidencia_id": "5a366233-918e-4764-b49b-d68ef8e6629c",
+    "fecha_inicio": "2026-01-12T00:00:00.000Z",
+    "fecha_fin": "2026-01-12T00:00:00.000Z",
+    "descripcion": "Onomastico",
+    "url_documento": "C:\\IncidenciasDocumentos\\Firma D.M.T.S.-1768950877519-704461321.png",
+    "estado_id": "b121b957-595e-4f48-ad91-268f2ec93f50",
+    "aprobado_por": null,
+    "aprobado_en": null,
+    "motivo_rechazo": null,
+    "creado_en": "2026-01-20T23:14:37.558Z"
+  }
+]

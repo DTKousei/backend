@@ -266,7 +266,7 @@ export const generarPDFPapeleta = async (permiso, tipoPermiso, empleadoInfo = {}
                 <table style="width:100%; margin:0; padding:0; border:none;">
                   <tr>
                     <td><strong>N° DE PAPELETA</strong></td>
-                    <td>${permiso.id.substring(0, 8).toUpperCase()}</td>
+                    <td>${(permiso.numero || '').toString().padStart(6, '0')}</td>
                   </tr>
                   <tr>
                     <td><strong>Fecha:</strong></td>
@@ -384,7 +384,7 @@ export const generarPDFPapeleta = async (permiso, tipoPermiso, empleadoInfo = {}
     await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
 
     // Generar nombre de archivo (Usar correlativo corto)
-    const nombreArchivo = `papeleta_${permiso.id.substring(0, 8)}.pdf`;
+    const nombreArchivo = `papeleta_${(permiso.numero || 'SN').toString().padStart(6, '0')}.pdf`;
     
     // Ruta de salida normalizada
     const relativeDir = 'generated'; 

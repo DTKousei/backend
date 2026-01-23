@@ -245,7 +245,10 @@ Content-Type: application/json
   "requiere_aprobacion": true,
   "requiere_documento": true,
   "descuenta_salario": false,
-  "esta_activo": true
+  "esta_activo": true,
+  "max_dias_anual": 30,
+  "max_solicitudes_anual": 12,
+  "toma_dias_calendario": true
 }
 ```
 
@@ -258,6 +261,9 @@ Content-Type: application/json
 | requiere_documento | boolean | Sí | Si requiere documento PDF |
 | descuenta_salario | boolean | Sí | Si descuenta del salario |
 | esta_activo | boolean | Sí | Si está activo |
+| max_dias_anual | integer | No | Límite de días permitidos por año |
+| max_solicitudes_anual | integer | No | Límite de veces que se puede solicitar por año |
+| toma_dias_calendario | boolean | No | true: cuenta L-D, false: cuenta solo días hábiles (L-V) |
 
 **Respuesta Exitosa (201 Created):**
 
@@ -272,6 +278,9 @@ Content-Type: application/json
     "requiere_documento": true,
     "descuenta_salario": false,
     "esta_activo": true,
+    "max_dias_anual": 30,
+    "max_solicitudes_anual": 12,
+    "toma_dias_calendario": true,
     "creado_en": "2025-12-03T10:00:00.000Z"
   }
 }
@@ -288,7 +297,8 @@ curl -X POST http://localhost:3003/api/tipos-incidencia \
     "requiere_aprobacion": true,
     "requiere_documento": true,
     "descuenta_salario": false,
-    "esta_activo": true
+    "esta_activo": true,
+    "max_dias_anual": 30
   }'
 ```
 
@@ -365,7 +375,8 @@ curl -X POST http://localhost:3003/api/tipos-incidencia \
 ```json
 {
   "nombre": "Permiso Médico Actualizado",
-  "esta_activo": false
+  "esta_activo": false,
+  "max_dias_anual": 45
 }
 ```
 
@@ -520,6 +531,15 @@ curl -X POST http://localhost:3003/api/incidencias \
       "location": "body"
     }
   ]
+}
+```
+
+**Límite excedido (400 Bad Request):**
+
+```json
+{
+  "error": "Límite excedido",
+  "message": "Esta solicitud de 5 días excede su saldo. Ha consumido 28 de 30 días permitidos este año."
 }
 ```
 
@@ -1136,3 +1156,97 @@ Para reportar problemas o solicitar nuevas funcionalidades, contacta al equipo d
 
 **Versión de la API:** 1.0.0  
 **Última actualización:** Diciembre 2025
+
+### 8. Obtener Saldos y Consumos de Incidencias
+
+Este endpoint permite consultar el estado de consumo de incidencias (días y veces solicitadas) frente a los límites anuales configurados, devolviendo un detalle de lo consumido y lo restante.
+
+> **Nota:** Si un límite es `null`, significa que es ilimitado y el saldo restante también se mostrará como `null`.
+
+**Endpoint:** `GET /api/incidencias/saldos`
+
+**Query Parameters (opcionales):**
+| Parámetro | Tipo | Descripción |
+|-----------|------|-------------|
+| empleado_id | string | Filtrar por un empleado específico |
+| anio | number | Año a consultar (Default: Año actual) |
+
+**Respuesta Exitosa (200 OK):**
+
+```json
+{
+  "anio": 2025,
+  "data": [
+    {
+      "empleado_id": "emp-123",
+      "saldos": [
+        {
+          "tipo_id": "uuid-tipo-vacaciones",
+          "tipo_nombre": "Vacaciones",
+          "tipo_codigo": "VAC001",
+          "limites": {
+            "dias": 30,
+            "solicitudes": null
+          },
+          "consumido": {
+            "dias": 20,
+            "solicitudes": 2
+          },
+          "restante": {
+            "dias": 10,
+            "solicitudes": null
+          },
+          "detalle": [
+            {
+              "id": "uuid-incidencia-1",
+              "fecha_inicio": "2025-01-01",
+              "fecha_fin": "2025-01-15",
+              "dias": 15,
+              "estado_id": "uuid-estado-aprobado"
+            },
+            {
+              "id": "uuid-incidencia-2",
+              "fecha_inicio": "2025-06-01",
+              "fecha_fin": "2025-06-05",
+              "dias": 5,
+              "estado_id": "uuid-estado-pendiente"
+            }
+          ]
+        },
+        {
+          "tipo_id": "uuid-tipo-onomastico",
+          "tipo_nombre": "Onomástico",
+          "tipo_codigo": "ONM001",
+          "limites": {
+            "dias": null,
+            "solicitudes": 1
+          },
+          "consumido": {
+            "dias": 1,
+            "solicitudes": 1
+          },
+          "restante": {
+            "dias": null,
+            "solicitudes": 0
+          },
+          "detalle": [
+            {
+              "id": "uuid-incidencia-3",
+              "fecha_inicio": "2025-05-20",
+              "fecha_fin": "2025-05-20",
+              "dias": 1,
+              "estado_id": "uuid-estado-aprobado"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Ejemplo con cURL:**
+
+```bash
+curl "http://localhost:3003/api/incidencias/saldos?empleado_id=12345678&anio=2026"
+```

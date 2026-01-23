@@ -15,14 +15,17 @@ datasource db {
 
 // 1. Modelo: TipoIncidencia (tipos_incidencia)
 model TipoIncidencia {
-  id                  String    @id @default(uuid())
-  nombre              String    @db.VarChar(100)
-  codigo              String    @db.VarChar(20)
-  requiere_aprobacion Boolean
-  requiere_documento  Boolean
-  descuenta_salario   Boolean
-  esta_activo         Boolean
-  creado_en           DateTime?
+  id                    String    @id @default(uuid())
+  nombre                String    @db.VarChar(100)
+  codigo                String    @db.VarChar(20)
+  requiere_aprobacion   Boolean
+  requiere_documento    Boolean
+  descuenta_salario     Boolean
+  esta_activo           Boolean
+  max_dias_anual        Int? // Límite de días por año (ej: 30 para vacaciones)
+  max_solicitudes_anual Int? // Límite de veces por año (ej: 1 para onomástico)
+  toma_dias_calendario  Boolean   @default(true) // true: cuenta sáb/dom, false: solo L-V
+  creado_en             DateTime?
 
   // Relación: Un tipo de incidencia puede tener muchas incidencias
   incidencias Incidencia[]

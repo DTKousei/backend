@@ -123,6 +123,88 @@ class UserService {
             where: { id }
         });
     }
+
+    async getLockStatus(id) {
+        const user = await prisma.usuarios.findUnique({
+            where: { id },
+            select: {
+                id: true,
+                usuario: true,
+                intentos_fallidos: true,
+                bloqueado_hasta: true
+            }
+        });
+
+        if (!user) throw new Error('Usuario no encontrado');
+
+        const isLocked = user.bloqueado_hasta && new Date(user.bloqueado_hasta) > new Date();
+        
+        return {
+            isLocked,
+            intentos_fallidos: user.intentos_fallidos,
+            bloqueado_hasta: user.bloqueado_hasta
+        };
+    }
+
+    async unlockUser(id) {
+        const user = await prisma.usuarios.findUnique({ where: { id } });
+        if (!user) throw new Error('Usuario no encontrado');
+
+        return await prisma.usuarios.update({
+            where: { id },
+            data: {
+                intentos_fallidos: 0,
+                bloqueado_hasta: null
+            },
+            select: {
+                id: true,
+                usuario: true,
+                intentos_fallidos: true,
+                bloqueado_hasta: true
+            }
+        });
+    }
+
+    async getLockStatusByUsername(usuario) {
+        const user = await prisma.usuarios.findFirst({
+            where: { usuario },
+            select: {
+                id: true,
+                usuario: true,
+                intentos_fallidos: true,
+                bloqueado_hasta: true
+            }
+        });
+
+        if (!user) throw new Error('Usuario no encontrado');
+
+        const isLocked = user.bloqueado_hasta && new Date(user.bloqueado_hasta) > new Date();
+        
+        return {
+            isLocked,
+            intentos_fallidos: user.intentos_fallidos,
+            bloqueado_hasta: user.bloqueado_hasta
+        };
+    }
+
+    async unlockUserByUsername(usuario) {
+        const user = await prisma.usuarios.findFirst({ where: { usuario } });
+        if (!user) throw new Error('Usuario no encontrado');
+
+        return await prisma.usuarios.update({
+            where: { id: user.id },
+            data: {
+                intentos_fallidos: 0,
+                bloqueado_hasta: null
+            },
+            select: {
+                id: true,
+                usuario: true,
+                intentos_fallidos: true,
+                bloqueado_hasta: true
+            }
+        });
+    }
 }
 
 module.exports = new UserService();

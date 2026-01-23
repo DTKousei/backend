@@ -143,8 +143,8 @@ def crear_feriado(feriado: FeriadoCreate, db: Session = Depends(get_db)):
     return HorarioService.crear_feriado(db, feriado)
 
 @router.get("/feriados/", response_model=List[FeriadoResponse])
-def listar_feriados(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return HorarioService.obtener_feriados(db, skip=skip, limit=limit)
+def listar_feriados(db: Session = Depends(get_db)):
+    return HorarioService.obtener_feriados(db)
 
 @router.delete("/feriados/{feriado_id}", status_code=status.HTTP_204_NO_CONTENT)
 def eliminar_feriado(feriado_id: int, db: Session = Depends(get_db)):

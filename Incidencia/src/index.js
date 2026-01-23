@@ -25,8 +25,8 @@ app.use(express.urlencoded({ extended: true })); // Parser de URL-encoded
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 100, // Límite de 100 peticiones por ventana
+  windowMs: 10 * 60 * 1000, // 10 minutos
+  max: 1000, // Límite de 1000 peticiones por ventana
   message: 'Demasiadas peticiones desde esta IP, por favor intente más tarde.',
 });
 app.use('/api/', limiter);

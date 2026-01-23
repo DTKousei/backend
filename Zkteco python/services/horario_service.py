@@ -179,8 +179,8 @@ class HorarioService:
         return db_feriado
 
     @staticmethod
-    def obtener_feriados(db: Session, skip: int = 0, limit: int = 100) -> List[Feriados]:
-        return db.query(Feriados).offset(skip).limit(limit).all()
+    def obtener_feriados(db: Session) -> List[Feriados]:
+        return db.query(Feriados).all()
 
     @staticmethod
     def eliminar_feriado(db: Session, feriado_id: int) -> bool:

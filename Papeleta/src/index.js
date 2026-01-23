@@ -68,8 +68,22 @@ app.use('/api/permisos', permisoRoutes);
 app.use(errorHandler);
 
 // Iniciar servidor
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
+  
+  // Mostrar IP de la red local
+  import('os').then(os => {
+    const interfaces = os.networkInterfaces();
+    for (const name of Object.keys(interfaces)) {
+      for (const interfaceInfo of interfaces[name]) {
+        // Saltar direcciones internas y no IPv4
+        if (!interfaceInfo.internal && interfaceInfo.family === 'IPv4') {
+          console.log(`📡 Accesible en tu Red LAN: http://${interfaceInfo.address}:${PORT}`);
+        }
+      }
+    }
+  });
+
   console.log(`📁 Directorio de uploads: ${uploadsDir}`);
   console.log(`📄 Directorio de PDFs generados: ${generatedDir}`);
   

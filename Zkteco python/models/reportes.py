@@ -59,3 +59,17 @@ class ReportesGenerados(Base):
 
     def __repr__(self):
         return f"<ReporteGenerado(tipo={self.tipo_reporte}, fecha={self.fecha_generacion}, area={self.area})>"
+
+class TipoReporte(Base):
+    """
+    Catálogo de tipos de reporte configurables.
+    """
+    __tablename__ = "tipos_reporte"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    nombre = Column(String(100), unique=True, nullable=False)
+    descripcion = Column(String(255), nullable=True)
+    activo = Column(Boolean, default=True)
+
+    def __repr__(self):
+        return f"<TipoReporte(nombre={self.nombre})>"

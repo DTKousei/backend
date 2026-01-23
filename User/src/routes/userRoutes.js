@@ -14,4 +14,8 @@ router.put('/usuario/:usuario', userController.updateByUsername);
 router.put('/:id', userController.update);
 router.delete('/:id', userController.delete);
 
+// Rutas de bloqueo/desbloqueo - Búsqueda por DNI (usuario)
+router.get('/:usuario/lock-status', userController.getLockStatus);
+router.post('/:usuario/unlock', userController.unlock);
+
 module.exports = router;

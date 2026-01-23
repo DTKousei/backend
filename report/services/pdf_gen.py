@@ -7,6 +7,7 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch, cm
 from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.pdfencrypt import StandardEncryption
 
 STORAGE_DIR = "storage"
 
@@ -36,8 +37,16 @@ def generate_pdf_report(data: dict) -> str:
     
     # Usamos LEGAL landscape para tener más ancho, o A3 si fuera necesario.
     # La imagen parece ancha. Probaremos Legal Landscape (35.56 cm ancho).
+    
+    # Configurar encriptación
+    # Contraseña de propietario aleatoria para bloquear edición
+    owner_password = uuid.uuid4().hex 
+    enc = StandardEncryption(userPassword="", ownerPassword=owner_password, 
+                             canPrint=1, canModify=0, canCopy=0, canAnnotate=0)
+
     doc = SimpleDocTemplate(absolute_path, pagesize=landscape(legal), 
-                            rightMargin=10, leftMargin=10, topMargin=20, bottomMargin=20)
+                            rightMargin=10, leftMargin=10, topMargin=20, bottomMargin=20,
+                            encrypt=enc)
     elements = []
     
     styles = getSampleStyleSheet()
@@ -121,8 +130,9 @@ def generate_pdf_report(data: dict) -> str:
         
         total_dias_mes = meta.get("dias_total", 30)
         
+        faltas = resumen.get("faltas", 0)
         row.append(str(total_dias_mes))
-        row.append("") # Dias no lab (placeholder)
+        row.append(str(faltas) if faltas > 0 else "") # Dias no lab
         row.append(str(dias_lab))
         row.append(str(tardanzas) if tardanzas > 0 else "")
         

@@ -13,7 +13,9 @@ from schemas.asistencia import (
     AsistenciaFilter,
     AsistenciaSincronizacion,
     AsistenciaDiariaResponse,
-    AsistenciaManualCreate
+    AsistenciaManualCreate,
+    ReporteUsuarioConResumen,
+    ResumenAsistencia
 )
 from services.asistencia_service import AsistenciaService
 
@@ -200,3 +202,73 @@ def obtener_reporte_asistencia(
     Obtiene el reporte procesado de asistencia diaria.
     """
     return AsistenciaService.obtener_reporte(db, fecha_inicio, fecha_fin, user_id)
+
+
+@router.get("/usuario/{user_id}/diario", response_model=ReporteUsuarioConResumen)
+def obtener_reporte_diario_usuario(
+    user_id: str,
+    fecha_inicio: date,
+    fecha_fin: date,
+    db: Session = Depends(get_db)
+):
+    """
+    Obtiene el reporte detallado para un usuario con resumen de totales.
+    """
+    # 1. Obtener detalle (lista plana)
+    detalle = AsistenciaService.obtener_reporte(db, fecha_inicio, fecha_fin, user_id)
+    
+    # 2. Calcular totales
+    total_horas = 0.0
+    total_extras = 0.0
+    dias_trabajados = 0
+    dias_falta = 0
+    dias_tarde = 0
+    
+    for dia in detalle:
+        # detalle es una lista de dicts (según nuestra última modificación del service)
+        # o lista de objetos Pydantic si el service hubiera cambiado.
+        # Asumimos dict por seguridad, o acceso atributo si es objeto.
+        # El service devuelve DICT ahora.
+        horas = dia.get("horas_trabajadas", 0) or 0
+        esperadas = dia.get("horas_esperadas", 0) or 0
+        estado = dia.get("estado_asistencia", "")
+        
+        horas_float = float(horas)
+        esperadas_float = float(esperadas)
+        
+        total_horas += horas_float
+        
+        # Calcular extra del día: si trabajó más de lo esperado
+        extra_dia = max(0, horas_float - esperadas_float)
+        total_extras += extra_dia
+        
+        if horas_float > 0:
+            dias_trabajados += 1
+            
+        if "FALTA" in estado.upper():
+            dias_falta += 1
+        elif "TARDE" in estado.upper():
+            dias_tarde += 1
+    
+    # helper formateo
+    def fmt(h):
+        if h is None: return "00:00"
+        hours = int(h)
+        minutes = int(round((h - hours) * 60))
+        return f"{hours:02d}:{minutes:02d}"
+
+    resumen = ResumenAsistencia(
+        total_horas_trabajadas=round(total_horas, 2),
+        total_horas_trabajadas_formato=fmt(total_horas),
+        total_horas_extras=round(total_extras, 2),
+        total_horas_extras_formato=fmt(total_extras),
+        dias_trabajados=dias_trabajados,
+        dias_falta=dias_falta,
+        dias_tarde=dias_tarde
+    )
+    
+    return ReporteUsuarioConResumen(
+        resumen=resumen,
+        detalle=detalle
+    )
+

@@ -1,0 +1,69 @@
+{
+  "anio": 2026,
+  "data": [
+    {
+      "empleado_id": "40126700",
+      "saldos": [
+        {
+          "tipo_id": "db5048f2-2ad4-499e-91d2-f1e80e1811a2",
+          "tipo_nombre": "COMISION DE SERVICIO",
+          "limites": {
+            "dias": null,
+            "solicitudes": null
+          },
+          "consumido": {
+            "dias": 0,
+            "solicitudes": 0
+          },
+          "restante": {
+            "dias": null,
+            "solicitudes": null
+          },
+          "detalle": []
+        },
+        {
+          "tipo_id": "0f553b9b-8019-414d-b066-d54e251232be",
+          "tipo_nombre": "LICENCIA POR SALUD",
+          "limites": {
+            "dias": null,
+            "solicitudes": null
+          },
+          "consumido": {
+            "dias": 0,
+            "solicitudes": 0
+          },
+          "restante": {
+            "dias": null,
+            "solicitudes": null
+          },
+          "detalle": []
+        },
+        {
+          "tipo_id": "5a366233-918e-4764-b49b-d68ef8e6629c",
+          "tipo_nombre": "ONOMASTICO",
+          "limites": {
+            "dias": 1,
+            "solicitudes": 1
+          },
+          "consumido": {
+            "dias": 1,
+            "solicitudes": 1
+          },
+          "restante": {
+            "dias": 0,
+            "solicitudes": 0
+          },
+          "detalle": [
+            {
+              "id": "53bffc0d-a699-457b-b68e-b0045848bffc",
+              "fecha_inicio": "2026-01-12",
+              "fecha_fin": "2026-01-12",
+              "dias": 1,
+              "estado_id": "b121b957-595e-4f48-ad91-268f2ec93f50"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

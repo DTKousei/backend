@@ -202,10 +202,9 @@ def generate_excel_report(data: dict) -> str:
         # DIA MES (30 o 31)
         worksheet.write(current_row, col_resumen, dias_total, style_cell)
         
-        # DIAS NO LAB (Faltas? O Feriados? Usaré Faltas base + Licencias por ahora o vacio como en imagen)
-        # Imagen tiene "DIAS NO LAB" en blanco mayormente.
-        # Pondré vacio por ahora para seguridad, o 0.
-        worksheet.write(current_row, col_resumen+1, "", style_cell) 
+        # DIAS NO LAB (Faltas)
+        # Corregido: Mostrar conteo de faltas
+        worksheet.write(current_row, col_resumen+1, faltas if faltas > 0 else "", style_cell) 
         
         # TOTAL DIAS LAB
         worksheet.write(current_row, col_resumen+2, dias_lab, style_cell)
@@ -266,6 +265,9 @@ def generate_excel_report(data: dict) -> str:
     footer_text = f"Querobamba, {fecha_footer}"
     row_footer = start_legend_row + len(leyenda)//2 + 2
     worksheet.merge_range(row_footer, 0, row_footer, last_day_col_idx, footer_text, workbook.add_format({'align': 'center'}))
+
+    # --- PROTECCIÓN ---
+    worksheet.protect()
 
     workbook.close()
     return absolute_path

@@ -1,0 +1,4 @@
+Asignaciones para User 28480082 (UID: 6 - MAVILON R. OCH)
+--------------------------------------------------
+ID: 5 | HorarioID: 1 | Inicio: 2024-01-01 | Fin: None
+ID: 4 | HorarioID: 1 | Inicio: 2026-01-09 | Fin: None

@@ -10,6 +10,8 @@ from models.turnos import SegmentosHorario, AsignacionHorario, Feriados
 from models.reportes import AsistenciaDiaria
 from schemas.asistencia import AsistenciaFilter
 from zkteco_connection import ZKTecoConnection
+from config import settings
+import requests
 
 import logging
 
@@ -82,22 +84,39 @@ class AsistenciaService:
             # Filtrar logs solo de hoy
             logs_hoy = [log for log in logs if log.timestamp.date() == hoy]
             
+            logger.info(f"[DEBUG] Sincronizar Hoy: Total logs recuperados del dispositivo: {len(logs)}")
+            logger.info(f"[DEBUG] Fecha hoy sistema: {hoy}")
+            if logs:
+                 logger.info(f"[DEBUG] Fecha primer log: {logs[0].timestamp} (Date: {logs[0].timestamp.date()})")
+                 logger.info(f"[DEBUG] Fecha ultimo log: {logs[-1].timestamp}")
+            logger.info(f"[DEBUG] Total logs para hoy: {len(logs_hoy)}")
+
+            
             for log in logs_hoy:
                 total_procesados += 1
+                
+                # FIX: Usar log.user_id (Badge Number) en lugar de log.uid (Indice interno)
+                try:
+                    real_uid = int(log.user_id)
+                except (ValueError, TypeError):
+                    logger.warning(f"Log ignorado: user_id no numerico '{log.user_id}'")
+                    continue
+
                 # Verificar si existe (uid + timestamp + dispositivo_id)
                 exists = db.query(Asistencia).filter(
-                    Asistencia.uid == log.uid,
+                    Asistencia.uid == real_uid,
                     Asistencia.timestamp == log.timestamp,
                     Asistencia.dispositivo_id == dispositivo_id
                 ).first()
                 
                 if not exists:
                     # Verificar si el usuario existe en la BD por UID
-                    usuario_existe = db.query(Usuario).filter(Usuario.uid == log.uid).first()
+                    # IMPORTANTE: El Usuario.uid en BD corresponde al Badge Number (user_id del dispositivo)
+                    usuario_existe = db.query(Usuario).filter(Usuario.uid == real_uid).first()
                     
                     if usuario_existe:
                         nuevo_log = Asistencia(
-                            uid=log.uid,
+                            uid=real_uid,
                             dispositivo_id=dispositivo_id,
                             timestamp=log.timestamp,
                             status=log.status,
@@ -141,42 +160,69 @@ class AsistenciaService:
             nuevos = 0
             total = len(logs)
             
-            for log in logs:
-                # Verificar si existe (user_id + timestamp + dispositivo_id)
-                exists = db.query(Asistencia).filter(
-                    Asistencia.uid == log.uid,
-                    Asistencia.timestamp == log.timestamp,
-                    Asistencia.dispositivo_id == dispositivo_id
-                ).first()
+            # Cache de usuarios conocidos para evitar queries repetitivos
+            # Set de UIDs que sabemos que existen en la BD (o acabamos de crear)
+            known_uids = set()
+            existing_users = db.query(Usuario.uid).filter(Usuario.uid != None).all()
+            for u in existing_users:
+                known_uids.add(u.uid)
                 
-                if not exists:
-                    # Verificar si el usuario existe en la BD usando UID
-                    # Si existe un usuario con ese UID, lo enlazamos.
-                    # Si el user_id (DNI) del log no coincide con el de BD, asumimos que el user_id del dispositivo está mal o es irrelevante
-                    usuario_existe = db.query(Usuario).filter(Usuario.uid == log.uid).first()
-                    
-                    # Logica: Si usuario con ese UID existe => Insertar
-                    # Si no existe => Ignorar o Crear (segun reglas, aqui es Ignorar)
-                    
-                    if usuario_existe:
-                        if usuario_existe.user_id != log.user_id:
-                             logger.warning(f"Conflicto de DNI: UID {log.uid} tiene DNI {log.user_id} en dispositivo pero {usuario_existe.user_id} en BD. Se usará el UID como verdad.")
+            for log in logs:
+                if log.timestamp.year > 2050:
+                    logger.warning(f"Log ignorado por fecha futura inválida: {log.timestamp} (UID: {log.uid})")
+                    continue
 
-                        nuevo_log = Asistencia(
-                            uid=log.uid, # UID entero
-                            dispositivo_id=dispositivo_id,
-                            timestamp=log.timestamp,
-                            status=log.status,
-                            punch=log.punch,
-                            sincronizado=True,
-                            fecha_sincronizacion=datetime.now()
-                        )
-                        db.add(nuevo_log)
-                        nuevos += 1
-                    else:
-                        logger.warning(f"Log ignorado: UID {log.uid} no existe en tabla Usuarios")
+                try:
+                    # IMPLEMENTACION "DESDE CERO":
+                    # Mapear log.user_id (string del dispositivo, ej "13") -> DB.uid (int, ej 13)
+                    
+                    try:
+                        real_uid = int(log.user_id)
+                    except (ValueError, TypeError):
+                        logger.warning(f"Log ignorado: user_id no numerico '{log.user_id}' en registro {log.uid}")
+                        continue
+                        
+                    # 1. Validación de Duplicados (Estricta: UID + Timestamp)
+                    # Usamos real_uid para chequear si ya guardamos esta asistencia
+                    exists = db.query(Asistencia).filter(
+                        Asistencia.uid == real_uid,
+                        Asistencia.timestamp == log.timestamp
+                    ).first()
+                    
+                    if exists:
+                        continue # Duplicado exacto
+
+                    # 2. Verificar existencia del Usuario
+                    # El usuario DEBE existir con ese UID (que debe coincidir con su user_id numérico)
+                    if real_uid not in known_uids:
+                        # Si no existe, lo ignoramos (UsuarioService debe encargarse primero)
+                        # El usuario pidio eliminar logica fantasma.
+                        # logger.warning(f"Asistencia ignorada: Usuario UID {real_uid} no existe en DB.")
+                        continue 
+
+                    # 3. Insertar Registro
+                    nuevo_log = Asistencia(
+                        uid=real_uid,
+                        dispositivo_id=dispositivo_id,
+                        timestamp=log.timestamp,
+                        status=log.status,
+                        punch=log.punch,
+                        sincronizado=True,
+                        fecha_sincronizacion=datetime.now()
+                    )
+                    db.add(nuevo_log)
+                    nuevos += 1
+                    
+                    # Commit periódico
+                    if nuevos % 100 == 0:
+                        db.commit()
+                        
+                except Exception as e:
+                    logger.error(f"Error procesando log {log.uid}: {e}")
+                    continue
             
-            db.commit()
+            db.commit() # Commit final
+            
             return {
                 "success": True, 
                 "message": "Sincronización completada", 
@@ -293,6 +339,72 @@ class AsistenciaService:
     # ---------------------------------------------------------
 
     @staticmethod
+    def verificar_incidencia(user_id: str, fecha_proceso: date) -> tuple[bool, str]:
+        """
+        Consulta la API de incidencias para ver si el usuario tiene una justificación aprobada.
+        Retorna (True, Codigo) si existe, o (False, None).
+        """
+        try:
+            # Añadir filtro por empleado_id para ser mas eficiente y preciso
+            url = f"{settings.INCIDENCIAS_API_URL}?empleado_id={user_id}"
+            
+            resp = requests.get(url, timeout=3)
+            if resp.status_code != 200:
+                logger.warning(f"Error consultando incidencias: {resp.status_code}")
+                return False, None
+            
+            data = resp.json()
+            incidencias = []
+            
+            # Manejar estructura paginada { data: [...], pagination: {...} } vs Lista directa [...]
+            if isinstance(data, dict):
+                incidencias = data.get('data', [])
+            elif isinstance(data, list):
+                incidencias = data
+            
+            dt_proceso = datetime.combine(fecha_proceso, time.min)
+            
+            for inc in incidencias:
+                # Validar empleado (redundante si la API filtra, pero seguro)
+                if str(inc.get('empleado_id')) != str(user_id):
+                    continue
+                    
+                # Validar estado Aprobado
+                estado_obj = inc.get('estado', {})
+                if not estado_obj or estado_obj.get('nombre') != 'Aprobado':
+                    continue
+                
+                # Validar fechas
+                f_inicio_str = inc.get('fecha_inicio') 
+                f_fin_str = inc.get('fecha_fin')
+                
+                if not f_inicio_str or not f_fin_str:
+                    continue
+                    
+                # Parsear fechas (ISO format)
+                try:
+                    # Cortamos la Z si existe
+                    dt_inicio = datetime.fromisoformat(f_inicio_str.replace('Z', '+00:00')).date()
+                    dt_fin = datetime.fromisoformat(f_fin_str.replace('Z', '+00:00')).date()
+                    
+                    if dt_inicio <= fecha_proceso <= dt_fin:
+                        # ENCONTRADA
+                        tipo_obj = inc.get('tipo_incidencia', {})
+                        codigo = tipo_obj.get('codigo', 'JUSTIFICADO')
+                        logger.info(f"Justificación encontrada para {user_id} el {fecha_proceso}: {codigo}")
+                        return True, codigo
+                        
+                except Exception as e_date:
+                    logger.error(f"Error parseando fechas incidencia: {e_date}")
+                    continue
+                    
+            return False, None
+            
+        except Exception as e:
+            logger.error(f"Excepción verificando incidencias: {e}")
+            return False, None
+
+    @staticmethod
     def procesar_asistencia_dia(db: Session, user_id: str, fecha_proceso: date):
         """
         Procesa la asistencia de un usuario para una fecha específica.
@@ -304,6 +416,8 @@ class AsistenciaService:
         if not usuario:
             logger.warning(f"Usuario {user_id} no encontrado")
             return None
+        
+        logger.info(f"Procesando asistencia para Usuario: {user_id} (UID: {usuario.uid}), Fecha: {fecha_proceso}")
 
         # 2. Buscar asignación de horario vigente
         asignacion = db.query(AsignacionHorario).filter(
@@ -341,11 +455,14 @@ class AsistenciaService:
             reporte.estado_asistencia = "FALTA" # Por defecto
         
         if not asignacion:
+            logger.info(f"Usuario {user_id} NO tiene horario asignado para {fecha_proceso}")
             if not es_feriado:
                 reporte.estado_asistencia = "SIN_HORARIO"
             db.add(reporte)
             db.commit()
             return reporte
+        
+        logger.info(f"Horario asignado encontrado: ID {asignacion.horario_id}")
 
         reporte.horario_id_snapshot = asignacion.horario_id
         
@@ -357,11 +474,14 @@ class AsistenciaService:
         ).order_by(SegmentosHorario.hora_inicio).all()
         
         if not segmentos:
+            logger.info(f"Horario {asignacion.horario_id} NO tiene segmentos para dia {dia_semana}")
             if not es_feriado:
                 reporte.estado_asistencia = "DIA_LIBRE"
             db.add(reporte)
             db.commit()
             return reporte
+
+        logger.info(f"Segmentos encontrados: {len(segmentos)}")
 
         # Buscar logs del día usando UID
         inicio_dia = datetime.combine(fecha_proceso, time.min)
@@ -373,6 +493,10 @@ class AsistenciaService:
             Asistencia.timestamp >= inicio_dia,
             Asistencia.timestamp <= fin_dia
         ).order_by(Asistencia.timestamp).all()
+        
+        logger.info(f"Logs crudos encontrados para UID {usuario.uid} en fecha {fecha_proceso}: {len(logs)}")
+        # for l in logs:
+        #      logger.info(f"  -> Log: {l.timestamp} (Status: {l.status}, Punch: {l.punch})")
         
         logs_times = [log.timestamp.time() for log in logs]
         
@@ -449,6 +573,15 @@ class AsistenciaService:
                             salida_valida = t
                             salida_idx = i
             
+            # Logs de debug emparejamiento
+            if entrada_valida:
+                logger.info(f"  [Segmento {inicio_seg}-{fin_seg}] ENTRADA encontrada: {entrada_valida}")
+            else:
+                logger.info(f"  [Segmento {inicio_seg}-{fin_seg}] NO se encontró entrada válida en ventana {inicio_min-120} - {inicio_min + segmento.tolerancia_minutos + 60}")
+                
+            if salida_valida:
+                logger.info(f"  [Segmento {inicio_seg}-{fin_seg}] SALIDA encontrada: {salida_valida}")
+            
             if entrada_valida:
                 used_indices.add(entrada_idx)
             
@@ -474,43 +607,72 @@ class AsistenciaService:
                 horas_reales = (dt_sal - dt_ent).total_seconds() / 3600.0
                 total_horas_trabajadas += horas_reales
                 
-        # Estado final
-        if es_feriado:
-            estado_final = "FERIADO"
-            if hubo_asistencia:
-                 estado_final = "FERIADO_TRABAJADO"
-        elif not hubo_asistencia:
-            estado_final = "FALTA"
-        else:
-            # Lógica de Estado en Tiempo Real vs Pasado
-            ultimo_fin_seg = max([seg.hora_fin for seg in segmentos]) if segmentos else time(0,0)
-            fecha_ahora = datetime.now()
-            
-            # Limite para marcar salida: Fin de turno + tolerancias (ej 4h)
-            dt_fin_turno = datetime.combine(fecha_proceso, ultimo_fin_seg)
-            dt_limite_salida = dt_fin_turno + timedelta(hours=2)
-            
-            es_dia_pasado_o_terminado = (fecha_proceso < fecha_ahora.date()) or (fecha_proceso == fecha_ahora.date() and fecha_ahora > dt_limite_salida)
-            
-            if total_horas_trabajadas < (total_horas_esperadas * 0.5):
-                # Caso: Marcó entrada pero no salida (o muy pocas horas)
-                
-                if not es_dia_pasado_o_terminado:
-                    # AUN ESTA EN HORARIO LABORAL (o dentro del limite)
-                    # Mostrar "PRESENTE" o "TARDE" según su ingreso, ignorando que falta salida por ahora
-                    if llegada_tarde:
-                        estado_final = "TARDE"
-                    else:
-                        estado_final = "PRESENTE"
-                else:
-                    # YA ACABO EL DIA y no marcó salida
-                    estado_final = "ABANDONO"
+        # -------------------------------------------------------------
+        # LÓGICA DE ESTADO BASE (Basado solo en horas trabajadas)
+        # -------------------------------------------------------------
+        estado_base = "FALTA" # Default preliminar
+        
+        # Lógica de Estado en Tiempo Real vs Pasado
+        ultimo_fin_seg = max([seg.hora_fin for seg in segmentos]) if segmentos else time(0,0)
+        fecha_ahora = datetime.now()
+        
+        # Limite para marcar salida: Fin de turno + tolerancias (ej 4h)
+        dt_fin_turno = datetime.combine(fecha_proceso, ultimo_fin_seg)
+        dt_limite_salida = dt_fin_turno + timedelta(hours=2)
+        
+        es_dia_pasado_o_terminado = (fecha_proceso < fecha_ahora.date()) or (fecha_proceso == fecha_ahora.date() and fecha_ahora > dt_limite_salida)
+        
+        completo_horas = total_horas_trabajadas >= (total_horas_esperadas - 0.05)
+        
+        if completo_horas:
+            # Horas completas -> PRESENTE o TARDE
+            if llegada_tarde:
+                estado_base = "TARDE"
             else:
-                 # Horas suficientes -> Estado base
-                 if llegada_tarde:
-                    estado_final = "TARDE"
-                 else:
-                    estado_final = "PRESENTE"
+                estado_base = "PRESENTE"
+        else:
+            # Horas incompletas (o 0 horas)
+            if not es_dia_pasado_o_terminado:
+                 # AUN ESTA EN HORARIO LABORAL (o dentro del limite)
+                 # Si ya marco entrada, decimos PRESENTE/TARDE temporalmente
+                 if primer_ingreso:
+                    if llegada_tarde:
+                        estado_base = "TARDE"
+                    else:
+                        estado_base = "PRESENTE"
+                 # Si no ha marcado nada, sigue siendo FALTA (o S/M)
+            else:
+                 # DIA TERMINADO y no completó horas
+                 estado_base = "FALTA"
+
+        # -------------------------------------------------------------
+        # LÓGICA DE PRIORIDAD FINAL (Requirements Usuario)
+        # -------------------------------------------------------------
+        # Prioridad:
+        # 1. Si TRABAJÓ COMPLETO (PRESENTE/TARDE) -> Se queda ese estado (incluso si es feriado, es Feriado Trabajado implícito)
+        # 2. Si es FERIADO y no trabajó completo -> FERIADO (Incluso si marcó entrada y se fue, o no vino)
+        # 3. Si tiene INCIDENCIA y no trabajó completo -> INCIDENCIA
+        # 4. FALTA
+        
+        tiene_justificacion, codigo_just = AsistenciaService.verificar_incidencia(user_id, fecha_proceso)
+
+        if estado_base in ["PRESENTE", "TARDE"]:
+            estado_final = estado_base
+            # Caso especial: Si es feriado y trabajó, a veces quieren ver "FERIADO_TRABAJADO" o simplemente "PRESENTE"
+            # El usuario dijo: "solo si el usuario tiene su estado presente no priorizar el feriado" -> PRESENTE gana.
+        
+        elif es_feriado:
+             estado_final = "FERIADO"
+             reporte.es_justificado = True
+             
+        elif tiene_justificacion:
+             estado_final = codigo_just
+             reporte.es_justificado = True
+        
+        else:
+             estado_final = "FALTA"
+
+        logger.info(f"  -> Estado Final: {estado_final} (Base: {estado_base}, Feriado: {bool(es_feriado)}, Incidencia: {tiene_justificacion})")
 
         reporte.horas_esperadas = total_horas_esperadas
         reporte.horas_trabajadas = round(total_horas_trabajadas, 2)
@@ -546,11 +708,42 @@ class AsistenciaService:
         return resultados
 
     @staticmethod
-    def obtener_reporte(db: Session, fecha_inicio: date, fecha_fin: date, user_id: Optional[str] = None) -> List[AsistenciaDiaria]:
+    def obtener_reporte(db: Session, fecha_inicio: date, fecha_fin: date, user_id: Optional[str] = None) -> List[dict]:
         query = db.query(AsistenciaDiaria).filter(
             AsistenciaDiaria.fecha >= fecha_inicio,
             AsistenciaDiaria.fecha <= fecha_fin
         )
         if user_id:
             query = query.filter(AsistenciaDiaria.user_id == user_id)
-        return query.order_by(AsistenciaDiaria.fecha, AsistenciaDiaria.user_id).all()
+        
+        results = query.order_by(AsistenciaDiaria.fecha, AsistenciaDiaria.user_id).all()
+        
+        # Convertir a dict y agregar campos formateados
+        reporte_final = []
+        for r in results:
+            item = {
+                "id": r.id,
+                "fecha": r.fecha,
+                "user_id": r.user_id,
+                "horario_id_snapshot": r.horario_id_snapshot,
+                "horas_esperadas": r.horas_esperadas,
+                "horas_trabajadas": r.horas_trabajadas,
+                "estado_asistencia": r.estado_asistencia,
+                "es_justificado": r.es_justificado,
+                "entrada_real": r.entrada_real,
+                "salida_real": r.salida_real,
+            }
+            
+            # Helper para formato
+            def fmt(h):
+                if h is None: return "00:00"
+                hours = int(h)
+                minutes = int(round((h - hours) * 60))
+                return f"{hours:02d}:{minutes:02d}"
+                
+            item["horas_esperadas_formato"] = fmt(r.horas_esperadas)
+            item["horas_trabajadas_formato"] = fmt(r.horas_trabajadas)
+            
+            reporte_final.append(item)
+            
+        return reporte_final

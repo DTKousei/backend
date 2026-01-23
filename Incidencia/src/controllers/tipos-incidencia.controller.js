@@ -5,7 +5,7 @@ const prisma = require('../utils/prisma');
  */
 const createTipoIncidencia = async (req, res, next) => {
   try {
-    const { nombre, codigo, requiere_aprobacion, requiere_documento, descuenta_salario, esta_activo } = req.body;
+    const { nombre, codigo, requiere_aprobacion, requiere_documento, descuenta_salario, esta_activo, max_dias_anual, max_solicitudes_anual, toma_dias_calendario } = req.body;
 
     const tipoIncidencia = await prisma.tipoIncidencia.create({
       data: {
@@ -15,6 +15,9 @@ const createTipoIncidencia = async (req, res, next) => {
         requiere_documento,
         descuenta_salario,
         esta_activo,
+        max_dias_anual,
+        max_solicitudes_anual,
+        toma_dias_calendario: toma_dias_calendario !== undefined ? toma_dias_calendario : true,
         creado_en: new Date(),
       },
     });
@@ -91,7 +94,7 @@ const getTipoIncidenciaById = async (req, res, next) => {
 const updateTipoIncidencia = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { nombre, codigo, requiere_aprobacion, requiere_documento, descuenta_salario, esta_activo } = req.body;
+    const { nombre, codigo, requiere_aprobacion, requiere_documento, descuenta_salario, esta_activo, max_dias_anual, max_solicitudes_anual, toma_dias_calendario } = req.body;
 
     const updateData = {};
     if (nombre !== undefined) updateData.nombre = nombre;
@@ -100,6 +103,9 @@ const updateTipoIncidencia = async (req, res, next) => {
     if (requiere_documento !== undefined) updateData.requiere_documento = requiere_documento;
     if (descuenta_salario !== undefined) updateData.descuenta_salario = descuenta_salario;
     if (esta_activo !== undefined) updateData.esta_activo = esta_activo;
+    if (max_dias_anual !== undefined) updateData.max_dias_anual = max_dias_anual;
+    if (max_solicitudes_anual !== undefined) updateData.max_solicitudes_anual = max_solicitudes_anual;
+    if (toma_dias_calendario !== undefined) updateData.toma_dias_calendario = toma_dias_calendario;
 
     const tipoIncidencia = await prisma.tipoIncidencia.update({
       where: { id },

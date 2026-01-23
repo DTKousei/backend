@@ -1,0 +1,10 @@
+--- Probando verificación de incidencia para 28306193 en 2026-01-09 ---
+--- Diagnosticando respuesta API con FILTRO ---
+Consultando: http://localhost:3003/api/incidencias?empleado_id=28306193
+Status Code: 200
+Response Type: <class 'dict'>
+Raw Response: {'data': [], 'pagination': {'total': 0, 'page': 1, 'limit': 10, 'totalPages': 0}}
+Items to process: 0
+Direct Check Result via Service: Exists=False, Code=None
+--- Forzando reprocesamiento del día ---
+ERROR: No se generó reporte.

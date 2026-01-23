@@ -51,6 +51,7 @@ model Estado {
 // 3. Modelo: permisos (Permisos) - La tabla central
 model Permiso {
   id              String @id @default(uuid()) @map("id")
+  numero          Int    @unique @default(autoincrement()) // Número correlativo (1, 2, 3...)
   empleado_id     String @db.VarChar(36) // FK a tabla empleados
   tipo_permiso_id String @db.VarChar(36)
   estado_id       String @db.VarChar(36)

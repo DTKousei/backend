@@ -10,6 +10,14 @@ from models.turnos import AsignacionHorario, SegmentosHorario # Models for check
 from sqlalchemy import or_
 # Si Horario logic is needed for "Feriado" vs "Domingo", we might need more logic here.
 # For now relying on AsistenciaDiaria.estado_asistencia or simple calendar logic.
+import io
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter, landscape
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from datetime import datetime
+import schemas.reportes
 
 class ReporteService:
     """
@@ -27,9 +35,9 @@ class ReporteService:
         "LICENCIA_GO": "L/C",   # Licencia con goce
         "COMISION": "C/S",      # Comisión de servicio
         "PERMISO": "PER",
-        "PERMISO": "PER",
         "DESCANSO": "D",        # Descanso médico o semanal
-        "ABANDONO": "A/B"       # Abandono de trabajo
+        "ABANDONO": "A/B",      # Abandono de trabajo
+        "SIN_HORARIO": "S/H"    # Sin horario asignado
     }
 
     @staticmethod
@@ -193,65 +201,121 @@ class ReporteService:
             }
             
             for d in range(1, num_dias + 1):
+                # Validar fecha futura: Si es mayor a hoy, ignorar (poner vacío y continuar)
+                fecha_iter_check = date(anio, mes, d)
+                if fecha_iter_check > date.today():
+                    asistencia_dias.append("")
+                    continue
+
                 key = (emp.user_id, d)
                 codigo = ""
                 
+                should_recalculate = False
+                
                 if key in map_registros:
                     reg = map_registros[key]
-                    estado = reg.estado_asistencia
-                    codigo = ReporteService._obtener_codigo_corto(estado)
-                    
-                    # Calcular estadisticas
-                    if codigo == "A":
-                        stats["dias_lab"] += 1
-                    elif codigo == "T":
-                        stats["tardanzas"] += 1
-                        stats["dias_lab"] += 1 # Tarde cuenta como laborado generalmente? O separado. Lo contaremos como asistencia pero con tardanza.
-                    elif codigo == "FAL":
-                        stats["faltas"] += 1
-                    elif codigo in ["L/S", "C/S", "VAC", "PER"]:
-                        stats["licencias"] += 1
-                else:
-                    # No hay registro. Validar si es día laboral según horario.
+                    # Si el estado es SIN_HORARIO pero creemos que podria haber (stale data), intentamos recalcular
+                    if reg.estado_asistencia == "SIN_HORARIO":
+                        should_recalculate = True
+                    else:
+                        estado = reg.estado_asistencia
+                        if estado == "DIA_LIBRE":
+                             # Si es día libre, mostrar la inicial del día (L, M, S, D...)
+                             # para mantener consistencia con los días no procesados.
+                             current_date = date(anio, mes, d)
+                             iniciales = ["L", "M", "M", "J", "V", "S", "D"]
+                             codigo = iniciales[current_date.weekday()]
+                        else:
+                             codigo = ReporteService._obtener_codigo_corto(estado)
+                        
+                        # Calcular estadisticas
+                        if codigo == "A":
+                            stats["dias_lab"] += 1
+                        elif codigo == "T":
+                            stats["tardanzas"] += 1
+                            stats["dias_lab"] += 1 
+                        elif codigo == "FAL":
+                            stats["faltas"] += 1
+                        elif codigo in ["L/S", "C/S", "VAC", "PER"]:
+                            stats["licencias"] += 1
+                            
+                    # Si se marco para recalcular, caemos al bloque 'else' o lo manejamos aqui
+                    if should_recalculate:
+                        # Forzamos que entre al bloque de "No hay registro" (o similar logic)
+                        pass
+                
+                # Bloque unificado de calculo/recuperacion
+                if key not in map_registros or should_recalculate:
+                    # No hay registro procesado en AsistenciaDiaria.
+                    # INTENTO DE AUTO-CÁLCULO (Lazy Loading):
+                    # Solo intentamos calcular si la fecha es pasado o hoy, para no procesar futuro innecesariamente
                     fecha_iter = date(anio, mes, d)
                     
-                    # 1. Buscar horario activo en fecha_iter
-                    horario_activo_id = None
-                    # Recorrer asignaciones del empleado
-                    # Se asume que no hay solapamientos. Tomamos el primero que coincida.
-                    if emp.user_id in map_asignaciones:
-                        for asignacion in map_asignaciones[emp.user_id]:
-                            fin_valido = asignacion.fecha_fin is None or asignacion.fecha_fin >= fecha_iter
-                            inicio_valido = asignacion.fecha_inicio <= fecha_iter
+                    registro_calculado = None
+                    if fecha_iter <= date.today():
+                        # Evitar circular import
+                        from services.asistencia_service import AsistenciaService
+                        try:
+                            # Procesar el día on-the-fly
+                            # Esto consultará Logs (por UID) y generará la AsistenciaDiaria si corresponde
+                            registro_calculado = AsistenciaService.procesar_asistencia_dia(db, emp.user_id, fecha_iter)
+                        except Exception as e:
+                            print(f"Error auto-calculando {emp.user_id} {fecha_iter}: {e}")
                             
-                            if inicio_valido and fin_valido:
-                                horario_activo_id = asignacion.horario_id
-                                break
-                    
-                    # 2. Verificar si es día laborable en ese horario
-                    es_dia_laborable = False
-                    if horario_activo_id and horario_activo_id in map_dias_laborables:
-                        dias_lab_set = map_dias_laborables[horario_activo_id]
-                        dia_semana_actual = fecha_iter.weekday() # 0=Lun, 6=Dom
-                        if dia_semana_actual in dias_lab_set:
-                            es_dia_laborable = True
-                    
-                    # 3. Determinar estado
-                    # Si no tiene horario asignado, asumimos que no trabaja => Descanso (D)
-                    # Si tiene horario y es día laborable => FALTA
-                    # Si tiene horario y NO es día laborable => Descanso (D)
-                    
-                    if fecha_iter > date.today():
-                        codigo = "" # Futuro
-                    elif es_dia_laborable:
-                        codigo = "FAL"
-                        stats["faltas"] += 1
+                    if registro_calculado:
+                        # Si se generó registro, usarlo
+                        estado = registro_calculado.estado_asistencia
+                        if estado == "DIA_LIBRE":
+                             current_date = date(anio, mes, d)
+                             iniciales = ["L", "M", "M", "J", "V", "S", "D"]
+                             codigo = iniciales[current_date.weekday()]
+                        else:
+                             codigo = ReporteService._obtener_codigo_corto(estado)
+                        
+                        # Actualizar estadísticas con el nuevo registro
+                        if codigo == "A":
+                            stats["dias_lab"] += 1
+                        elif codigo == "T":
+                            stats["tardanzas"] += 1
+                            stats["dias_lab"] += 1
+                        elif codigo == "FAL":
+                            stats["faltas"] += 1
+                        elif codigo in ["L/S", "C/S", "VAC", "PER"]:
+                            stats["licencias"] += 1
+                            
                     else:
-                        # Usar inicial del día para Descanso/No Laborable
-                        # 0=L, 1=M, 2=M, 3=J, 4=V, 5=S, 6=D
-                        iniciales_dias = ["L", "M", "M", "J", "V", "S", "D"]
-                        dia_semana_actual = fecha_iter.weekday()
-                        codigo = iniciales_dias[dia_semana_actual]
+                        # Si aún no hay registro (ej. futuro, o error, o el proceso retornó None), aplicar lógica de horario por defecto
+                        
+                        # 1. Buscar horario activo en fecha_iter
+                        horario_activo_id = None
+                        if emp.user_id in map_asignaciones:
+                            for asignacion in map_asignaciones[emp.user_id]:
+                                fin_valido = asignacion.fecha_fin is None or asignacion.fecha_fin >= fecha_iter
+                                inicio_valido = asignacion.fecha_inicio <= fecha_iter
+                                
+                                if inicio_valido and fin_valido:
+                                    horario_activo_id = asignacion.horario_id
+                                    break
+                        
+                        # 2. Verificar si es día laborable en ese horario
+                        es_dia_laborable = False
+                        if horario_activo_id and horario_activo_id in map_dias_laborables:
+                            dias_lab_set = map_dias_laborables[horario_activo_id]
+                            dia_semana_actual = fecha_iter.weekday() # 0=Lun, 6=Dom
+                            if dia_semana_actual in dias_lab_set:
+                                es_dia_laborable = True
+                        
+                        # 3. Determinar estado default
+                        if fecha_iter > date.today():
+                            codigo = "" # Futuro
+                        elif es_dia_laborable:
+                            codigo = "FAL"
+                            stats["faltas"] += 1
+                        else:
+                            # Usar inicial del día para Descanso/No Laborable
+                            iniciales_dias = ["L", "M", "M", "J", "V", "S", "D"]
+                            dia_semana_actual = fecha_iter.weekday()
+                            codigo = iniciales_dias[dia_semana_actual]
                 
                 asistencia_dias.append(codigo)
             
@@ -273,3 +337,245 @@ class ReporteService:
             "columnas_dias": columnas_dias,
             "data": data_empleados
         }
+
+    @staticmethod
+    def obtener_saldos_incidencias_pdf(db: Session, anio: int, empleado_id: Optional[str] = None):
+        """
+        Genera un PDF con el reporte de saldos de incidencias.
+        """
+        from models.incidencia import TipoIncidencia, Incidencia
+        from models.usuario import Usuario
+        from sqlalchemy import func
+
+        # 1. Obtener Tipos de Incidencia (Columnas)
+        tipos = db.query(TipoIncidencia).filter(TipoIncidencia.activo == True).order_by(TipoIncidencia.nombre).all()
+        
+        # 2. Obtener Empleados
+        query_users = db.query(Usuario).filter(Usuario.esta_activo == True).order_by(Usuario.nombre)
+        if empleado_id:
+            query_users = query_users.filter(Usuario.user_id == empleado_id)
+        
+        empleados = query_users.all()
+
+        # 3. Calcular Saldos
+        data_reporte = []
+
+        headers = ["N°", "DNI", "Apellidos y Nombres"]
+        for tipo in tipos:
+            headers.append(f"{tipo.nombre[:10]}...") # Abreviar
+
+        # Preparar data
+        for idx, emp in enumerate(empleados, 1):
+            row = [str(idx), emp.user_id, emp.nombre]
+            
+            for tipo in tipos:
+                # Calcular dias consumidos
+                consumidos = db.query(func.sum(Incidencia.dias_consumidos)).filter(
+                    Incidencia.empleado_id == emp.user_id,
+                    Incidencia.tipo_incidencia_id == tipo.id,
+                    extract('year', Incidencia.fecha_inicio) == anio,
+                    Incidencia.estado_id != 3 # Excluir Rechazados/Cancelados si aplica. Asumimos 3=Rechazado, validar ID
+                ).scalar() or 0
+                
+                # Formato: Consumido / Max
+                # max_dias puede ser null (ilimitado)
+                max_txt = str(tipo.max_dias_anio) if tipo.max_dias_anio else "∞"
+                row.append(f"{consumidos} / {max_txt}")
+            
+            data_reporte.append(row)
+
+        # 4. Generar PDF
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=landscape(letter))
+        elements = []
+        styles = getSampleStyleSheet()
+
+        # Título
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=16,
+            alignment=1, # Center
+            spaceAfter=30
+        )
+        elements.append(Paragraph(f"Reporte de Saldos de Incidencias - {anio}", title_style))
+        elements.append(Paragraph(f"Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}", styles['Normal']))
+        elements.append(Spacer(1, 20))
+
+        # Tabla
+        table_data = [headers] + data_reporte
+        
+        # Ajustar anchos de columna dinámicamente o fijo
+        # DNI (1 inch), Nombre (2.5 inch), Resto repartido
+        col_widths = [0.5*inch, 1*inch, 2.5*inch]
+        rest_width = (11 - 4) * inch # Landscape letter width approx 11
+        if len(tipos) > 0:
+            type_col_width = rest_width / len(tipos)
+            col_widths.extend([type_col_width] * len(tipos))
+
+        t = Table(table_data, colWidths=col_widths if len(tipos) <= 8 else None) # Si son muchos, auto-adjust o reducir
+
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ]))
+
+        elements.append(t)
+        doc.build(elements)
+        
+        buffer.seek(0)
+        return buffer
+
+
+    # --- CRUD TipoReporte ---
+    @staticmethod
+    def get_tipos_reporte(db: Session, skip: int = 0, limit: int = 100):
+        from models.reportes import TipoReporte
+        return db.query(TipoReporte).offset(skip).limit(limit).all()
+
+    @staticmethod
+    def create_tipo_reporte(db: Session, tipo_data: schemas.reportes.TipoReporteCreate):
+        from models.reportes import TipoReporte
+        db_tipo = TipoReporte(**tipo_data.dict())
+        db.add(db_tipo)
+        db.commit()
+        db.refresh(db_tipo)
+        return db_tipo
+
+    @staticmethod
+    def update_tipo_reporte(db: Session, tipo_id: int, tipo_data: schemas.reportes.TipoReporteCreate):
+        from models.reportes import TipoReporte
+        db_tipo = db.query(TipoReporte).filter(TipoReporte.id == tipo_id).first()
+        if db_tipo:
+            for key, value in tipo_data.dict().items():
+                setattr(db_tipo, key, value)
+            db.commit()
+            db.refresh(db_tipo)
+        return db_tipo
+
+    @staticmethod
+    def delete_tipo_reporte(db: Session, tipo_id: int):
+        from models.reportes import TipoReporte
+        db_tipo = db.query(TipoReporte).filter(TipoReporte.id == tipo_id).first()
+        if db_tipo:
+            db.delete(db_tipo)
+            db.commit()
+            return True
+        return False
+
+    @staticmethod
+    def obtener_saldos_incidencias_pdf(db: Session, anio: int, empleado_id: Optional[str] = None):
+        """
+        Genera un PDF con el reporte de saldos de incidencias.
+        """
+        from models.incidencia import TipoIncidencia, Incidencia
+        from models.usuario import Usuario
+        from sqlalchemy import func
+        # Log del reporte
+        from models.reportes import ReportesGenerados
+        import json
+
+        try:
+             nuevo_reporte = ReportesGenerados(
+                 tipo_reporte="Saldos de Incidencias",
+                 anio=anio,
+                 mes=0, # Saldos es anual, mes no aplica o poner 0
+                 area=None,
+                 filtros=json.dumps({"empleado_id": empleado_id, "formato": "PDF"}) if empleado_id else json.dumps({"formato": "PDF"})
+             )
+             db.add(nuevo_reporte)
+             db.commit()
+        except Exception as e:
+             print(f"Error logging report: {e}")
+             db.rollback()
+
+        # 1. Obtener Tipos de Incidencia (Columnas)
+        tipos = db.query(TipoIncidencia).filter(TipoIncidencia.activo == True).order_by(TipoIncidencia.nombre).all()
+        
+        # 2. Obtener Empleados
+        query_users = db.query(Usuario).filter(Usuario.esta_activo == True).order_by(Usuario.nombre)
+        if empleado_id:
+            query_users = query_users.filter(Usuario.user_id == empleado_id)
+        
+        empleados = query_users.all()
+
+        # 3. Calcular Saldos
+        data_reporte = []
+
+        headers = ["N°", "DNI", "Apellidos y Nombres"]
+        for tipo in tipos:
+            headers.append(f"{tipo.nombre[:10]}...") # Abreviar
+
+        # Preparar data
+        for idx, emp in enumerate(empleados, 1):
+            row = [str(idx), emp.user_id, emp.nombre]
+            
+            for tipo in tipos:
+                # Calcular dias consumidos
+                consumidos = db.query(func.sum(Incidencia.dias_consumidos)).filter(
+                    Incidencia.empleado_id == emp.user_id,
+                    Incidencia.tipo_incidencia_id == tipo.id,
+                    extract('year', Incidencia.fecha_inicio) == anio,
+                    Incidencia.estado_id != 3 # Excluir Rechazados/Cancelados si aplica. Asumimos 3=Rechazado, validar ID
+                ).scalar() or 0
+                
+                # Formato: Consumido / Max
+                # max_dias puede ser null (ilimitado)
+                max_txt = str(tipo.max_dias_anio) if tipo.max_dias_anio else "∞"
+                row.append(f"{consumidos} / {max_txt}")
+            
+            data_reporte.append(row)
+
+        # 4. Generar PDF
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=landscape(letter))
+        elements = []
+        styles = getSampleStyleSheet()
+
+        # Título
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=16,
+            alignment=1, # Center
+            spaceAfter=30
+        )
+        elements.append(Paragraph(f"Reporte de Saldos de Incidencias - {anio}", title_style))
+        elements.append(Paragraph(f"Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}", styles['Normal']))
+        elements.append(Spacer(1, 20))
+
+        # Tabla
+        table_data = [headers] + data_reporte
+        
+        # Ajustar anchos de columna dinámicamente o fijo
+        # DNI (1 inch), Nombre (2.5 inch), Resto repartido
+        col_widths = [0.5*inch, 1*inch, 2.5*inch]
+        rest_width = (11 - 4) * inch # Landscape letter width approx 11
+        if len(tipos) > 0:
+            type_col_width = rest_width / len(tipos)
+            col_widths.extend([type_col_width] * len(tipos))
+
+        t = Table(table_data, colWidths=col_widths if len(tipos) <= 8 else None) # Si son muchos, auto-adjust o reducir
+
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ]))
+
+        elements.append(t)
+        doc.build(elements)
+        
+        buffer.seek(0)
+        return buffer

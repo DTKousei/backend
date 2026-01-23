@@ -192,6 +192,21 @@ const validateCreateTipoIncidencia = [
     .withMessage('El campo esta_activo es requerido')
     .isBoolean()
     .withMessage('El campo esta_activo debe ser un booleano'),
+
+  body('max_dias_anual')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('El límite de días anuales debe ser un número entero positivo'),
+
+  body('max_solicitudes_anual')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('El límite de solicitudes anuales debe ser un número entero positivo'),
+
+  body('toma_dias_calendario')
+    .optional()
+    .isBoolean()
+    .withMessage('El campo toma_dias_calendario debe ser un booleano'),
   
   validate,
 ];

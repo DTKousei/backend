@@ -103,11 +103,50 @@ class AuthService {
         throw new Error('Usuario inactivo');
       }
 
+      // 1. Verificar si está bloqueado
+      if (user.bloqueado_hasta && new Date(user.bloqueado_hasta) > new Date()) {
+        const tiempoRestante = Math.ceil((new Date(user.bloqueado_hasta) - new Date()) / 1000 / 60);
+        throw new Error(`Tu cuenta ha sido bloqueada temporalmente por seguridad. Intenta nuevamente en ${tiempoRestante} minutos.`);
+      }
+
       // Verificar contraseña
       const isPasswordValid = await comparePassword(contrasena, user.contrasena_hash);
 
       if (!isPasswordValid) {
+        // 2. Manejo de intentos fallidos
+        const nuevosIntentos = (user.intentos_fallidos || 0) + 1;
+        let updateData = { intentos_fallidos: nuevosIntentos };
+
+        // Si llega a 5 intentos, bloquear por 15 minutos
+        if (nuevosIntentos >= 5) {
+          const bloqueoHasta = new Date();
+          bloqueoHasta.setMinutes(bloqueoHasta.getMinutes() + 15);
+          
+          updateData.bloqueado_hasta = bloqueoHasta;
+          updateData.intentos_fallidos = 0; // Reiniciamos contador para el siguiente ciclo tras el desbloqueo
+        }
+
+        await prisma.usuarios.update({
+          where: { id: user.id },
+          data: updateData
+        });
+
+        if (nuevosIntentos >= 5) {
+             throw new Error('Demasiados intentos fallidos. Tu cuenta ha sido bloqueada por 15 minutos.');
+        }
+
         throw new Error('Credenciales inválidas');
+      }
+
+      // 3. Login exitoso: Resetear contadores de bloqueo
+      if (user.intentos_fallidos > 0 || user.bloqueado_hasta) {
+        await prisma.usuarios.update({
+          where: { id: user.id },
+          data: {
+            intentos_fallidos: 0,
+            bloqueado_hasta: null
+          }
+        });
       }
 
       // Generar token

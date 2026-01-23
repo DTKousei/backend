@@ -23,6 +23,8 @@ app.add_middleware(
 # Incluir las rutas del módulo de reportes
 app.include_router(reports.router)
 app.include_router(report_types.router)
+from routers import system
+app.include_router(system.router, prefix="/api/system", tags=["System"])
 from routers import attendance
 app.include_router(attendance.router)
 

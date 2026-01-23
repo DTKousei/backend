@@ -484,8 +484,8 @@ export const verPDF = async (req, res, next) => {
       throw new AppError(ERROR_MESSAGES.PERMISO_NOT_FOUND, 404);
     }
 
-    // Definir nombre de archivo personalizado usando el ID
-    const numeroPapeleta = permiso.id.substring(0, 8).toUpperCase();
+    // Definir nombre de archivo personalizado usando el Número Correlativo
+    const numeroPapeleta = (permiso.numero || 'SN').toString().padStart(6, '0');
     const nombreArchivo = `papeleta_${numeroPapeleta}.pdf`;
     const rutaRelativa = `/generated/${nombreArchivo}`;
     const rutaAbsoluta = path.join(__dirname, '../../generated', nombreArchivo);
@@ -773,3 +773,107 @@ export const cambiarEstadoPermiso = async (req, res, next) => {
       next(error);
     }
   };
+
+/**
+ * Registrar retorno del permiso (Marca hora fin actual)
+ * Bypasea validación de tiempo máximo para permitir retornos tardíos
+ */
+export const registrarRetorno = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    
+    // Obtener permiso actual
+    const permiso = await prisma.permiso.findUnique({
+      where: { id },
+      include: { tipo_permiso: true }
+    });
+
+    if (!permiso) {
+      throw new AppError(ERROR_MESSAGES.PERMISO_NOT_FOUND, 404);
+    }
+
+    // Fecha actual del servidor
+    const fechaFin = new Date();
+    
+    // Calcular hora de salida (si aplica)
+    const validacion = validarTiempoPermiso(
+        permiso.fecha_hora_inicio,
+        fechaFin,
+        permiso.tipo_permiso
+    );
+
+    // NOTA: No lanzamos error si excede el tiempo, solo calculamos la hora de salida
+    // para propósitos informativos o de registro si fuera necesario, 
+    // pero permitimos el registro.
+
+    const horaSalida = calcularHoraSalida(
+        permiso.fecha_hora_inicio,
+        fechaFin,
+        permiso.tipo_permiso
+    );
+
+    // Actualizar permiso
+    const permisoActualizado = await prisma.permiso.update({
+      where: { id },
+      data: {
+        fecha_hora_fin: fechaFin,
+        hora_salida_calculada: horaSalida
+        // Estado podría cambiar a "COMPLETADO" si se desea, 
+        // pero por ahora mantenemos el flujo existente que solo marca retorno.
+      },
+      include: {
+        tipo_permiso: true,
+        estado: true
+      }
+    });
+
+    // --- REGENERAR PDF CON LA NUEVA HORA ---
+    try {
+        const empleadoInfo = {};
+        try {
+          const [userRes, deptoRes] = await Promise.all([
+            fetch(`http://localhost:8000/api/usuarios/user_id/${permiso.empleado_id}`).catch(err => ({ ok: false, err })),
+            fetch(`http://localhost:8000/api/departamentos/usuario/${permiso.empleado_id}`).catch(err => ({ ok: false, err }))
+          ]);
+    
+          if (userRes.ok) {
+            const userData = await userRes.json();
+            const user = userData.data || userData;
+            empleadoInfo.nombre = user.nombre_completo || 
+                                (user.nombres ? `${user.nombres} ${user.apellidos || ''}`.trim() : null) || 
+                                user.nombre;
+          }
+    
+          if (deptoRes.ok) {
+            const deptoData = await deptoRes.json();
+            const depto = deptoData.data || deptoData;
+            empleadoInfo.area = depto.nombre || depto.nombre_departamento || depto.departamento;
+          }
+        } catch (errorExterno) {
+          console.error('Error obteniendo datos externos para regenerar PDF (retorno):', errorExterno);
+        }
+    
+        const resultadoPDF = await generarPDFPapeleta(permisoActualizado, permisoActualizado.tipo_permiso, empleadoInfo);
+    
+        await prisma.permiso.update({
+          where: { id },
+          data: { pdf_generado_path: resultadoPDF.rutaRelativa }
+        });
+
+        permisoActualizado.pdf_generado_path = resultadoPDF.rutaRelativa;
+
+    } catch (pdfError) {
+        console.error('Error regenerando PDF al registrar retorno:', pdfError);
+    }
+    // ----------------------------------------
+
+    res.json({
+      success: true,
+      message: 'Hora de retorno registrada exitosamente',
+      data: permisoActualizado
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};
