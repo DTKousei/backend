@@ -54,6 +54,25 @@ def obtener_asistencias(
     return AsistenciaService.obtener_asistencias(db, filtros)
 
 
+@router.get("/marcaciones/{user_id}", response_model=List[AsistenciaResponse])
+def obtener_marcaciones_usuario_dia(
+    user_id: str,
+    fecha: date = Query(..., description="Fecha de consulta (YYYY-MM-DD)"),
+    db: Session = Depends(get_db)
+):
+    """
+    Obtiene todas las marcaciones crudas de un usuario para un día específico
+    """
+    try:
+        return AsistenciaService.obtener_marcaciones_dia(db, user_id, fecha)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+
+
+
 @router.get("/count")
 def contar_asistencias(
     user_id: Optional[str] = None,

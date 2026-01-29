@@ -1175,10 +1175,10 @@ Este endpoint permite consultar el estado de consumo de incidencias (días y vec
 
 ```json
 {
-  "anio": 2025,
+  "anio": 2026,
   "data": [
     {
-      "empleado_id": "emp-123",
+      "empleado_id": "12345678",
       "saldos": [
         {
           "tipo_id": "uuid-tipo-vacaciones",

@@ -685,6 +685,29 @@ class AsistenciaService:
         return reporte
 
     @staticmethod
+    def obtener_marcaciones_dia(db: Session, user_id: str, fecha: date) -> List[Asistencia]:
+        """
+        Obtiene todas las marcaciones (logs crudos) de un usuario para un día específico
+        """
+        # 1. Resolver user_id a UID (interno dispositivo)
+        usuario = db.query(Usuario).filter(Usuario.user_id == user_id).first()
+        if not usuario:
+            raise ValueError(f"Usuario {user_id} no encontrado")
+            
+        # 2. Definir rango del día completo
+        inicio_dia = datetime.combine(fecha, time.min)
+        fin_dia = datetime.combine(fecha, time.max)
+        
+        # 3. Consultar logs
+        logs = db.query(Asistencia).filter(
+            Asistencia.uid == usuario.uid,
+            Asistencia.timestamp >= inicio_dia,
+            Asistencia.timestamp <= fin_dia
+        ).order_by(Asistencia.timestamp.asc()).all()
+        
+        return logs
+
+    @staticmethod
     def calcular_rango_asistencia(db: Session, fecha_inicio: date, fecha_fin: date, user_id: str = None):
         """
         Procesa un rango de fechas.
