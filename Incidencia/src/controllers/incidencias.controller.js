@@ -131,10 +131,7 @@ const createIncidencia = async (req, res, next) => {
  */
 const getAllIncidencias = async (req, res, next) => {
   try {
-    const { page = 1, limit = 10, empleado_id, estado_id, tipo_incidencia_id } = req.query;
-
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    const take = parseInt(limit);
+    const { page = 1, limit, empleado_id, estado_id, tipo_incidencia_id } = req.query;
 
     // Construir filtros
     const where = {};
@@ -142,12 +139,20 @@ const getAllIncidencias = async (req, res, next) => {
     if (estado_id) where.estado_id = estado_id;
     if (tipo_incidencia_id) where.tipo_incidencia_id = tipo_incidencia_id;
 
-    // Obtener incidencias con paginación
+    // Configurar paginación solo si se envía limit
+    let paginationOptions = {};
+    if (limit) {
+      paginationOptions = {
+        skip: (parseInt(page) - 1) * parseInt(limit),
+        take: parseInt(limit),
+      };
+    }
+
+    // Obtener incidencias
     const [incidencias, total] = await Promise.all([
       prisma.incidencia.findMany({
         where,
-        skip,
-        take,
+        ...paginationOptions,
         include: {
           tipo_incidencia: true,
           estado: true,
@@ -164,8 +169,8 @@ const getAllIncidencias = async (req, res, next) => {
       pagination: {
         total,
         page: parseInt(page),
-        limit: parseInt(limit),
-        totalPages: Math.ceil(total / parseInt(limit)),
+        limit: limit ? parseInt(limit) : total,
+        totalPages: limit ? Math.ceil(total / parseInt(limit)) : 1,
       },
     });
   } catch (error) {

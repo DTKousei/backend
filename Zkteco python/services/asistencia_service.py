@@ -429,18 +429,23 @@ class AsistenciaService:
         es_feriado = db.query(Feriados).filter(Feriados.fecha == fecha_proceso).first()
         
         # Estado inicial del reporte
-        reporte = db.query(AsistenciaDiaria).filter(
+        # Estrategia Agresiva: Eliminar cualquier registro previo para este día/usuario y crear uno nuevo.
+        # Esto garantiza que no queden duplicados y se limpie el estado.
+        db.query(AsistenciaDiaria).filter(
             AsistenciaDiaria.user_id == user_id,
             AsistenciaDiaria.fecha == fecha_proceso
-        ).first()
-
-        if not reporte:
-            reporte = AsistenciaDiaria(
-                user_id=user_id,
-                fecha=fecha_proceso
-            )
+        ).delete()
         
-        # Reset valores cálculo
+        # Crear nuevo registro limpio
+        reporte = AsistenciaDiaria(
+            user_id=user_id,
+            fecha=fecha_proceso
+        )
+        db.add(reporte)
+        # Commit intermedio para asegurar que el delete se aplique antes de seguir (opcional pero seguro)
+        db.flush() 
+        
+        # Reset valores cálculo (redundante pues es nuevo, pero mantenemos por consistencia)
         reporte.horas_trabajadas = 0.0
         reporte.horas_esperadas = 0.0
         reporte.entrada_real = None
@@ -548,10 +553,11 @@ class AsistenciaService:
             # 2. Buscar MEJOR Salida
             salida_valida = None
             salida_idx = -1
-            min_diff_salida = float('inf')
             
             fin_min = fin_seg.hour * 60 + fin_seg.minute
             
+            candidatos_salida = [] # Lista de tuplas: (index, time_obj, minutes_val, diff_abs)
+
             if entrada_valida:
                 for i, t in enumerate(logs_times):
                     if i in used_indices or i == entrada_idx:
@@ -566,13 +572,33 @@ class AsistenciaService:
                     
                     # Ventana salida: desde (inicio + 30m) hasta (fin + 4h)
                     if (inicio_min + 30) <= t_min <= (fin_min + 240):
-                        # Candidato válido, verificar si es el más cercano a hora_fin
+                        # Candidato válido dentro de la ventana amplia
                         diff = abs(t_min - fin_min)
-                        if diff < min_diff_salida:
-                            min_diff_salida = diff
-                            salida_valida = t
-                            salida_idx = i
-            
+                        candidatos_salida.append((i, t, t_min, diff))
+
+            # LÓGICA DE SELECCIÓN PRIORIZADA
+            if candidatos_salida:
+                # 1. Prioridad: Buscar registros DESPUES o IGUAL a la hora de salida
+                post_salida = [c for c in candidatos_salida if c[2] >= fin_min]
+                
+                seleccionado = None
+                
+                if post_salida:
+                    # Si existen salidas después de la hora, tomamos la más cercana a la hora de salida
+                    # (Es decir, la primera que ocurrió después de la salida oficial)
+                    post_salida.sort(key=lambda x: x[3]) # Ordenar por menor diferencia
+                    seleccionado = post_salida[0]
+                    # logger.info(f"  [Segmento {inicio_seg}-{fin_seg}] SALIDA: Prioridad Post-Salida aplicada.")
+                else:
+                    # 2. Fallback: Si no hay salidas posteriores, usamos la más cercana en general (Closest Match)
+                    # Esto seleccionará la salida ANTERIOR a la hora (ej: salió temprano) que esté más cerca
+                    candidatos_salida.sort(key=lambda x: x[3])
+                    seleccionado = candidatos_salida[0]
+                    # logger.info(f"  [Segmento {inicio_seg}-{fin_seg}] SALIDA: Fallback Closest Match aplicado.")
+                
+                salida_idx = seleccionado[0]
+                salida_valida = seleccionado[1]
+
             # Logs de debug emparejamiento
             if entrada_valida:
                 logger.info(f"  [Segmento {inicio_seg}-{fin_seg}] ENTRADA encontrada: {entrada_valida}")

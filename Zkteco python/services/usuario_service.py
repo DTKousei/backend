@@ -182,6 +182,20 @@ class UsuarioService:
                 return False
             
             try:
+                # LÓGICA DE ASIGNACIÓN DE UID MANUAL (Corrección solicitada)
+                # Si el usuario no tiene UID asignado (es nuevo del sistema), calculamos el siguiente
+                if not db_usuario.uid:
+                    # Buscar el UID máximo actual en la BD
+                    # Importar func aquí para evitar circular imports si fuera necesario, o usar SQL directo
+                    from sqlalchemy import func
+                    max_uid = db.query(func.max(Usuario.uid)).scalar() or 0
+                    nuevo_uid = max_uid + 1
+                    
+                    # Asignar al objeto de BD
+                    db_usuario.uid = nuevo_uid
+                    db.commit() # Guardar el UID generado
+                    logger.info(f"Asignado nuevo UID {nuevo_uid} al usuario {db_usuario.user_id}")
+
                 # Agregar o actualizar usuario en el dispositivo
                 success = zk.agregar_usuario(
                     user_id=db_usuario.user_id,
@@ -189,7 +203,7 @@ class UsuarioService:
                     privilege=db_usuario.privilegio,
                     password=db_usuario.password or '',
                     group_id=db_usuario.grupo or '',
-                    user_id_num=db_usuario.uid or 0
+                    user_id_num=db_usuario.uid # Usar el UID explícito
                 )
                 
                 if success:
@@ -257,49 +271,63 @@ class UsuarioService:
                 # ---------------------------------------------------------
                 for usuario_zk in usuarios_zk:
                     try:
-                        # IMPLEMENTACION "DESDE CERO": 
-                        # El campo user_id del dispositivo (ej. "13") es el VERDADERO identificador que vincula con los logs.
-                        # Por lo tanto, mapeamos Device.user_id -> DB.uid
+                        # IMPLEMENTACION SOLICITADA POR USUARIO:
+                        # uid (Sistema) = user_id (Biométrico) [Convertido a entero]
+                        # user_id (Sistema) = NO SE TOCA / NO RELACIONADO AL BIOMETRICO
                         
                         try:
-                            # Intentamos convertir el user_id (string) a entero para usarlo como UID
+                            # Convertimos el user_id del biométrico (ej. "42326694") a entero para el UID
                             final_uid = int(usuario_zk.user_id)
                         except ValueError:
-                            # Si tiene letras, fallback a u.uid (interno) o generar error
-                            logger.warning(f"Usuario {usuario_zk.name} tiene user_id no numerico '{usuario_zk.user_id}'. Saltando o usando fallback.")
-                            continue # Saltamos por seguridad para garantizar integridad de asistencias
+                            # Si el user_id del biométrico no es numérico, no podemos usarlo como UID
+                            logger.warning(f"Usuario {usuario_zk.name} con ID biometrico '{usuario_zk.user_id}' no es numérico. No se puede mapear a UID sistema.")
+                            continue 
 
-                        # Buscar en BD por este UID transformado
+                        zk_user_id_str = usuario_zk.user_id # El DNI real
+                        
+                        # Buscar en BD usando este UID (que ahora es el DNI numérico)
                         db_usuario = db.query(Usuario).filter(
                             Usuario.uid == final_uid
                         ).first()
                         
-                        # Preparar datos base
-                        # RECORDAR: DB.user_id es "desvinculado" pero debe ser UNIQUE y NON-NULL.
-                        # Usamos el mismo valor en string para cumplir constraints sin darle uso lógico.
+                        # Fallback: Si no existe por UID, buscar por user_id (DNI) por si acaso ya existía
+                        if not db_usuario:
+                            db_usuario = db.query(Usuario).filter(
+                                Usuario.user_id == zk_user_id_str
+                            ).first()
+                            if db_usuario:
+                                logger.info(f"Usuario encontrado por user_id '{zk_user_id_str}'. Se actualizará su UID a coincidir con el DNI: {final_uid}.")
+                        
+                        # Preparar datos base (Datos que SIEMPRE se sincronizan desde el dispositivo)
                         datos_usuario = {
-                            "uid": final_uid, 
                             "nombre": usuario_zk.name,
                             "privilegio": usuario_zk.privilege,
                             "password": usuario_zk.password,
                             "grupo": usuario_zk.group_id,
-                            "user_id": str(final_uid), # Relleno para cumplir constraint UNIQUE
                             "dispositivo_id": dispositivo_id,
-                            # Preservar fecha creación si existe, sino now()
                         }
 
                         if db_usuario:
                             # Actualizar
-                            update_stmt = (
-                                update(Usuario)
-                                .where(Usuario.uid == final_uid)
-                                .values(**datos_usuario)
-                            )
-                            db.execute(update_stmt)
+                            # 1. EXCLUIMOS 'user_id' (DNI) para no perder el dato del sistema
+                            # 2. EXCLUIMOS 'uid' si ya existe, para no perder el índice original
+                            
+                            # Solo si el usuario en BD no tiene UID (caso raro), le asignamos el nuevo
+                            if not db_usuario.uid:
+                                datos_usuario["uid"] = final_uid
+                            
+                            for key, value in datos_usuario.items():
+                                setattr(db_usuario, key, value)
+                            
                             usuarios_actualizados += 1
                         else:
                             # Crear Nuevo
-                            nuevo_usuario = Usuario(**datos_usuario)
+                            # Solo al crear asignamos user_id y uid iniciales
+                            datos_creacion = datos_usuario.copy()
+                            datos_creacion["user_id"] = zk_user_id_str
+                            datos_creacion["uid"] = final_uid
+                            
+                            nuevo_usuario = Usuario(**datos_creacion)
                             db.add(nuevo_usuario)
                             usuarios_nuevos += 1
                             

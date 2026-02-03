@@ -3,7 +3,7 @@ Modelos de Turnos y Asignaciones
 """
 
 from sqlalchemy import Column, Integer, String, Time, Date, ForeignKey, Boolean
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 from models.database import Base
 
 class SegmentosHorario(Base):
@@ -44,7 +44,7 @@ class AsignacionHorario(Base):
     fecha_fin = Column(Date, nullable=True, comment="Fecha fin validez (Null = indefinido)")
     
     # Relaciones
-    usuario = relationship("Usuario", backref="asignaciones_horario")
+    usuario = relationship("Usuario", backref=backref("asignaciones_horario", cascade="all, delete-orphan"))
 
     horario = relationship("Horario")
 

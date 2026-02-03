@@ -228,15 +228,21 @@ class ReporteService:
                         else:
                              codigo = ReporteService._obtener_codigo_corto(estado)
                         
-                        # Calcular estadisticas
-                        if codigo == "A":
+                        # Lógica de Días Laborables / Computables
+                        # Se incluyen Feriados, Licencias con Goce y Días Libres (S, D, etc)
+                        # Se EXCLUYE L/S (Licencia Sin Goce) y FAL (Falta)
+                        # Iniciales de días libres: L, M, J, V, S, D
+                        codigos_computables = ["A", "T", "FER", "VAC", "C/S", "PER", "L/C", "S", "D", "L", "M", "J", "V"]
+                        
+                        if codigo in codigos_computables:
                             stats["dias_lab"] += 1
-                        elif codigo == "T":
+                        
+                        # Estadísticas Específicas
+                        if codigo == "T":
                             stats["tardanzas"] += 1
-                            stats["dias_lab"] += 1 
                         elif codigo == "FAL":
                             stats["faltas"] += 1
-                        elif codigo in ["L/S", "C/S", "VAC", "PER"]:
+                        elif codigo in ["L/S", "L/C", "C/S", "VAC", "PER"]:
                             stats["licencias"] += 1
                             
                     # Si se marco para recalcular, caemos al bloque 'else' o lo manejamos aqui
@@ -272,15 +278,18 @@ class ReporteService:
                         else:
                              codigo = ReporteService._obtener_codigo_corto(estado)
                         
-                        # Actualizar estadísticas con el nuevo registro
-                        if codigo == "A":
+                        # Lógica de Días Laborables / Computables
+                        codigos_computables = ["A", "T", "FER", "VAC", "C/S", "PER", "L/C", "S", "D", "L", "M", "J", "V"]
+                        
+                        if codigo in codigos_computables:
                             stats["dias_lab"] += 1
-                        elif codigo == "T":
+                            
+                        # Estadísticas Específicas
+                        if codigo == "T":
                             stats["tardanzas"] += 1
-                            stats["dias_lab"] += 1
                         elif codigo == "FAL":
                             stats["faltas"] += 1
-                        elif codigo in ["L/S", "C/S", "VAC", "PER"]:
+                        elif codigo in ["L/S", "L/C", "C/S", "VAC", "PER"]:
                             stats["licencias"] += 1
                             
                     else:

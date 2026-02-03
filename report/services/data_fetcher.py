@@ -127,6 +127,22 @@ def fetch_sabana_data(mes: str, anio: str, user_ids: list[str] = None, area: str
                             
                             # Update the status in the list
                             asistencia[day_idx] = code
+                            
+                            # Actualizar contadores en el resumen
+                            resumen = emp.get("resumen", {})
+                            
+                            # 1. Siempre restar de Faltas porque ya está justificado
+                            # Aseguramos que no baje de 0
+                            resumen["faltas"] = max(0, resumen.get("faltas", 0) - 1)
+
+                            # 2. Sumar a Días Laborables SI NO ES 'LS/G'
+                            # El usuario indica que LS/G no cuenta como laborable, el resto (VAC, L/S, etc) sÍ.
+                            if code != "LS/G":
+                                resumen["dias_lab"] = resumen.get("dias_lab", 0) + 1
+                                
+                            # Guardamos cambios en el dict resumen (aunque al ser mutable se actualiza en emp)
+                            emp["resumen"] = resumen
+
                             break # Justified, move to next day
                             
         return report_data

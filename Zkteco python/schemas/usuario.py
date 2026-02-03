@@ -52,6 +52,9 @@ class UsuarioUpdate(BaseModel):
     fecha_nacimiento: Optional[date] = None
     direccion: Optional[str] = Field(None, max_length=255)
     comentarios: Optional[str] = Field(None, max_length=500)
+    
+    # Campo para corregir manualmente el ID interno del dispositivo
+    uid: Optional[int] = Field(None, description="ID interno del dispositivo (UID)")
 
 
 class UsuarioResponse(UsuarioBase):

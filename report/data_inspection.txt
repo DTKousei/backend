@@ -1,12 +1,12 @@
 Keys: ['empleado_id', 'nombre', 'user_id', 'departamento', 'asistencia_dias', 'resumen']
 Sample Data (excluding huge lists):
 {
-  "empleado_id": 4,
-  "nombre": "Diomar",
-  "user_id": "1",
+  "empleado_id": 71,
+  "nombre": "101",
+  "user_id": "101",
   "departamento": "Sin Departamento"
 }
 
 Sample asistencia_dias item:
-J
+FER
 Type: <class 'str'>
